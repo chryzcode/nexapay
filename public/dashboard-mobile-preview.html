@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NexaPay Mobile Dashboard Preview</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #0B0F1A;
+    }
+
+    .dashboard {
+      width: 350px;
+      height: 500px;
+      background-color: #0B0F1A;
+      border-radius: 16px;
+      overflow: hidden;
+      color: #F9F9FB;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px rgba(123, 97, 255, 0.15);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background-color: rgba(255, 255, 255, 0.05);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .logo {
+      font-weight: 700;
+      font-size: 20px;
+      background: linear-gradient(to right, #7B61FF, #A78BFA);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(to right, #7B61FF, #A78BFA);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .main {
+      padding: 16px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .balance-card {
+      background: linear-gradient(135deg, #7B61FF, #A78BFA);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .balance-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 8px;
+    }
+
+    .balance-amount {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .balance-address {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      background-color: rgba(0, 0, 0, 0.2);
+      padding: 8px 12px;
+      border-radius: 8px;
+      width: fit-content;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .action-btn {
+      flex: 1;
+      background-color: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .action-icon {
+      font-size: 20px;
+    }
+
+    .action-label {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .transactions {
+      background-color: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .transaction {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .transaction:last-child {
+      border-bottom: none;
+    }
+
+    .tx-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tx-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: rgba(123, 97, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tx-icon.green {
+      background: rgba(74, 222, 128, 0.1);
+      color: #4ade80;
+    }
+
+    .tx-icon.purple {
+      background: rgba(123, 97, 255, 0.1);
+      color: #7B61FF;
+    }
+
+    .tx-details {
+      font-size: 13px;
+    }
+
+    .tx-name {
+      font-weight: 500;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 150px;
+    }
+
+    .tx-date {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 11px;
+    }
+
+    .tx-amount {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .tx-amount.positive {
+      color: #4ade80;
+    }
+
+    .tx-amount.negative {
+      color: #ff5e5b;
+    }
+
+    .bottom-nav {
+      display: flex;
+      justify-content: space-around;
+      padding: 12px 16px;
+      background-color: rgba(255, 255, 255, 0.02);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .nav-icon {
+      font-size: 18px;
+    }
+
+    .nav-label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .nav-item.active .nav-label {
+      color: #7B61FF;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <div class="header">
+      <div class="logo">NexaPay</div>
+      <div class="avatar">JP</div>
+    </div>
+    <div class="main">
+      <div class="balance-card">
+        <div class="balance-label">Your Balance</div>
+        <div class="balance-amount">$2,458.32</div>
+        <div class="balance-address">0x7a3b...9f4d</div>
+      </div>
+
+      <div class="actions">
+        <div class="action-btn">
+          <div class="action-icon">↑</div>
+          <div class="action-label">Send</div>
+        </div>
+        <div class="action-btn">
+          <div class="action-icon">↓</div>
+          <div class="action-label">Receive</div>
+        </div>
+        <div class="action-btn">
+          <div class="action-icon">↔️</div>
+          <div class="action-label">Swap</div>
+        </div>
+      </div>
+
+      <div class="section-title">Recent Activity</div>
+      <div class="transactions">
+        <div class="transaction">
+          <div class="tx-info">
+            <div class="tx-icon green">↓</div>
+            <div class="tx-details">
+              <div class="tx-name">Payment from 0x8f...2a3e</div>
+              <div class="tx-date">Today, 11:42 AM</div>
+            </div>
+          </div>
+          <div class="tx-amount positive">+0.45 ETH</div>
+        </div>
+        <div class="transaction">
+          <div class="tx-info">
+            <div class="tx-icon purple">↑</div>
+            <div class="tx-details">
+              <div class="tx-name">Transfer to Wallet</div>
+              <div class="tx-date">Yesterday, 3:15 PM</div>
+            </div>
+          </div>
+          <div class="tx-amount negative">-125 USDC</div>
+        </div>
+        <div class="transaction">
+          <div class="tx-info">
+            <div class="tx-icon green">↓</div>
+            <div class="tx-details">
+              <div class="tx-name">Payment from 0x7b...9f4c</div>
+              <div class="tx-date">Feb 24, 9:30 AM</div>
+            </div>
+          </div>
+          <div class="tx-amount positive">+210.50 USDC</div>
+        </div>
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item active">
+        <div class="nav-icon">📊</div>
+        <div class="nav-label">Home</div>
+      </div>
+      <div class="nav-item">
+        <div class="nav-icon">💸</div>
+        <div class="nav-label">Payments</div>
+      </div>
+      <div class="nav-item">
+        <div class="nav-icon">🔄</div>
+        <div class="nav-label">Transactions</div>
+      </div>
+      <div class="nav-item">
+        <div class="nav-icon">⚙️</div>
+        <div class="nav-label">Settings</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html> 

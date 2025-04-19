@@ -1,0 +1,12 @@
+{
+  "name": "nexapay-dashboard-previews",
+  "version": "1.0.0",
+  "description": "Preview image generator for NexaPay",
+  "main": "generate-previews.js",
+  "scripts": {
+    "generate": "node generate-previews.js"
+  },
+  "dependencies": {
+    "puppeteer": "^22.0.0"
+  }
+} 

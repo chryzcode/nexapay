@@ -3,15 +3,16 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import MobileMenu from "./MobileMenu";
-import ThemeToggle from "./ThemeToggle";
+import { ThemeToggle } from "./ThemeToggle";
+import { useTheme } from "../providers/ThemeProvider";
+import { useAuth } from "@/context/AuthContext";
 
-type NavbarProps = {
-  isDarkMode: boolean;
-  toggleTheme: () => void;
-};
-
-export default function Navbar({ isDarkMode, toggleTheme }: NavbarProps) {
+export default function Navbar() {
+  const { isDarkMode } = useTheme();
+  const { user, logout } = useAuth();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLDivElement>(null);
 
@@ -20,11 +21,17 @@ export default function Navbar({ isDarkMode, toggleTheme }: NavbarProps) {
     setMobileMenuOpen(false);
   };
 
+  // Handle logout
+  const handleLogout = async () => {
+    await logout();
+    router.push('/');
+  };
+
   // Navigation links array for reusability
   const navLinks = [
-    { href: "#features", label: "Features" },
-    { href: "#how-it-works", label: "How It Works" },
-    { href: "#signin", label: "Sign In" },
+    { href: "/", label: "Home" },
+    { href: "/dashboard", label: "Dashboard" },
+    { href: "/transactions", label: "Transactions" },
   ];
 
   // Close mobile menu when clicking outside
@@ -64,7 +71,7 @@ export default function Navbar({ isDarkMode, toggleTheme }: NavbarProps) {
           : 'border border-gray-200 bg-white/90 shadow-lg shadow-black/5'
       } sticky top-4 z-50`}
     >
-      <h1 className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-[#7B61FF] to-[#A78BFA]">NexaPay</h1>
+      <Link href="/" className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-[#7B61FF] to-[#A78BFA]">NexaPay</Link>
       
       {/* Desktop Navigation */}
       <nav className="hidden md:flex items-center gap-1">
@@ -80,16 +87,36 @@ export default function Navbar({ isDarkMode, toggleTheme }: NavbarProps) {
           </Link>
         ))}
         
+        {user ? (
+          <button
+            onClick={handleLogout}
+            className={`${
+              isDarkMode ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-black/5'
+            } px-4 py-2 rounded-lg transition-colors font-medium`}
+          >
+            Logout
+          </button>
+        ) : (
+          <Link
+            href="/login"
+            className={`${
+              isDarkMode ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-black/5'
+            } px-4 py-2 rounded-lg transition-colors font-medium`}
+          >
+            Login
+          </Link>
+        )}
+        
         {/* Dark/Light Mode Toggle */}
         <div className="ml-2">
-          <ThemeToggle isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
+          <ThemeToggle />
         </div>
       </nav>
       
       {/* Mobile Menu Button */}
       <div className="md:hidden flex items-center gap-3" ref={menuButtonRef}>
         {/* Dark/Light Mode Toggle for Mobile */}
-        <ThemeToggle isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
+        <ThemeToggle />
         
         <div className="relative">
           <button 
@@ -129,6 +156,8 @@ export default function Navbar({ isDarkMode, toggleTheme }: NavbarProps) {
                 isDarkMode={isDarkMode}
                 onItemClick={handleMobileMenuItemClick}
                 navLinks={navLinks}
+                user={user}
+                onLogout={handleLogout}
               />
             )}
           </AnimatePresence>

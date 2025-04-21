@@ -8,6 +8,8 @@ interface User {
   email: string;
   username: string;
   isVerified: boolean;
+  userCode?: string;
+  fullname?: string;
 }
 
 interface AuthContextType {
@@ -18,6 +20,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   verifyEmail: (token: string) => Promise<void>;
+  refreshUser?: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,8 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(error.error || "Login failed");
     }
 
-    const data = await response.json();
-    setUser(data.user);
+    // After login, always refresh user from /api/auth/me for full info (userCode, fullname, etc)
+    await refreshUser?.();
   };
 
   const register = async (fullname: string, username: string, email: string, password: string) => {
@@ -128,6 +131,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshUser = async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.user);
+      }
+    } catch (error) {
+      console.error("Auth refresh failed:", error);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -136,7 +151,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       forgotPassword,
-      verifyEmail
+      verifyEmail,
+      refreshUser
     }}>
       {children}
     </AuthContext.Provider>

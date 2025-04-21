@@ -38,11 +38,21 @@ export async function POST(request: Request) {
       }
     );
 
-    // TODO: Send email with reset link
-    // For now, we'll just return the token (in production, this should be sent via email)
+    // Send email with reset link
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+    const htmlContent = `
+      <p>You requested a password reset for your NexaPay account.</p>
+      <p>Click the link below to reset your password. This link will expire in 1 hour:</p>
+      <p><a href="${resetUrl}">${resetUrl}</a></p>
+      <p>If you did not request this, please ignore this email.</p>
+    `;
+    // Use sendEmail from lib/email
+    const { sendEmail } = await import("@/lib/email");
+    await sendEmail(email, "Reset your NexaPay password", htmlContent);
+
     return NextResponse.json({
-      message: "Password reset link sent to your email",
-      resetToken, // Remove this in production
+      message: "Password reset link sent to your email"
     });
   } catch (error) {
     console.error("Forgot password error:", error);

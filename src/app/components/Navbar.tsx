@@ -15,6 +15,7 @@ export default function Navbar() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLDivElement>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // Handle mobile menu item click
   const handleMobileMenuItemClick = () => {
@@ -64,48 +65,78 @@ export default function Navbar() {
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className={`flex justify-between items-center backdrop-blur-md py-4 px-6 rounded-xl ${
-        isDarkMode 
-          ? 'border border-white/10 bg-black/30 shadow-lg shadow-black/10' 
-          : 'border border-gray-200 bg-white/90 shadow-lg shadow-black/5'
-      } sticky top-4 z-50`}
+      className={`flex justify-between items-center py-4 px-6 rounded-xl sticky top-4 z-[9999]
+        ${isDarkMode 
+          ? 'bg-[#18192b] border border-white/10 text-white'
+          : 'bg-white/90 border border-gray-200 text-gray-900'}
+        backdrop-blur-sm transition-colors duration-300`}
     >
       <Link href="/" className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-[#7B61FF] to-[#A78BFA]">NexaPay</Link>
       
       {/* Desktop Navigation */}
       <nav className="hidden md:flex items-center gap-1">
-        {navLinks.map((link) => (
+        {navLinks.filter((link) => link.href !== "/dashboard" && link.href !== "/transactions").map((link) => (
           <Link 
             key={link.href}
             href={link.href}
-            className={`${
-              isDarkMode ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-black/5'
-            } px-4 py-2 rounded-lg transition-colors font-medium`}
+            className="px-4 py-2 rounded-lg transition-colors font-medium"
           >
             {link.label}
           </Link>
         ))}
-        
+        {/* Only show navLinks not present in dropdown to avoid duplicates */}
         {user ? (
-          <button
-            onClick={handleLogout}
-            className={`${
-              isDarkMode ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-black/5'
-            } px-4 py-2 rounded-lg transition-colors font-medium`}
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-4">
+            {user.userCode && (
+              <div className="flex items-center gap-2 relative group">
+                <span className="text-base font-bold font-mono bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-3 py-1 rounded-full">
+                  {user.userCode}
+                </span>
+                <button
+                  className="focus:outline-none flex items-center gap-1 px-2 py-1 rounded-lg transition-colors"
+                  tabIndex={0}
+                  aria-haspopup="true"
+                  aria-expanded={dropdownOpen}
+                  onClick={() => setDropdownOpen((prev) => !prev)}
+                  onBlur={() => setDropdownOpen(false)}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="transition-transform duration-200"
+                  >
+                    <circle cx="9" cy="9" r="8" />
+                    <path d="M6 9l2 2 4-4" />
+                  </svg>
+                  <span className="transition-transform duration-200 inline-block">▼</span>
+                </button>
+                <div
+                  className="absolute right-0 mt-2 min-w-[180px] max-w-xs rounded-xl shadow-xl border transition-all duration-200 z-[9999] flex flex-col py-2"
+                  style={{ right: 0, left: 'auto', top: 'calc(100% + 0.5rem)', opacity: dropdownOpen ? 1 : 0, pointerEvents: dropdownOpen ? 'auto' : 'none' }}
+                  tabIndex={-1}
+                  onMouseDown={e => e.preventDefault()}
+                >
+                  <Link href="/dashboard" className="block px-4 py-2 rounded-lg transition-colors font-medium">Dashboard</Link>
+                  <Link href="/transactions" className="block px-4 py-2 rounded-lg transition-colors font-medium">Transactions</Link>
+                  <Link href="/settings" className="block px-4 py-2 rounded-lg transition-colors font-medium">Settings</Link>
+                  <button onClick={handleLogout} className="w-full text-left block px-4 py-2 rounded-lg transition-colors font-medium">Logout</button>
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
           <Link
             href="/login"
-            className={`${
-              isDarkMode ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-black/5'
-            } px-4 py-2 rounded-lg transition-colors font-medium`}
+            className="px-4 py-2 rounded-lg transition-colors font-medium"
           >
             Login
           </Link>
         )}
-        
         {/* Dark/Light Mode Toggle */}
         <div className="ml-2">
           <ThemeToggle />
@@ -119,11 +150,7 @@ export default function Navbar() {
         
         <div className="relative">
           <button 
-            className={`relative z-50 p-2 rounded-lg ${
-              isDarkMode 
-                ? mobileMenuOpen ? 'bg-white/10' : 'hover:bg-white/10' 
-                : mobileMenuOpen ? 'bg-black/10' : 'hover:bg-black/5'
-            } transition-colors`}
+            className="relative z-50 p-2 rounded-lg transition-colors"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
           >
@@ -133,11 +160,11 @@ export default function Navbar() {
               height="24" 
               viewBox="0 0 24 24" 
               fill="none" 
-              stroke={isDarkMode ? "white" : "#111827"}
+              stroke="currentColor"
               strokeWidth="2" 
               strokeLinecap="round" 
               strokeLinejoin="round"
-              className={`transition-transform duration-300 ${mobileMenuOpen ? 'rotate-90' : ''}`}
+              className="transition-transform duration-300"
             >
               {mobileMenuOpen ? (
                 <path d="M18 6L6 18M6 6l12 12" />
@@ -149,6 +176,9 @@ export default function Navbar() {
           
           {/* Mobile Menu */}
           <AnimatePresence>
+            {mobileMenuOpen && (
+              <div className="fixed inset-0 z-[9998] bg-black/50" onClick={() => setMobileMenuOpen(false)} />
+            )}
             {mobileMenuOpen && (
               <MobileMenu 
                 isOpen={mobileMenuOpen}

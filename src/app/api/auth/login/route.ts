@@ -23,6 +23,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!user.isVerified) {
+      return NextResponse.json(
+        { error: "Email not verified" },
+        { status: 401 }
+      );
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return NextResponse.json(
@@ -33,7 +40,7 @@ export async function POST(request: Request) {
 
     const token = jwt.sign(
       { userId: user._id.toString(), email: user.email },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET as string,
       { expiresIn: "7d" }
     );
 

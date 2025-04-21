@@ -22,12 +22,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       ?.split('=')[1] || 'light';
     
     setIsDarkMode(theme === 'dark');
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.classList.toggle('light', theme !== 'dark');
     setIsInitialized(true);
   }, []);
 
   const handleToggleTheme = async () => {
     const { theme } = await toggleTheme();
     setIsDarkMode(theme === 'dark');
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.classList.toggle('light', theme !== 'dark');
   };
 
   // Don't render children until theme is initialized

@@ -58,10 +58,9 @@ export async function POST(request: Request) {
     // Send verification email
     await sendVerificationEmail(email, verificationToken);
 
+    // Respond with a simple message to check email for verification link
     return NextResponse.json({
-      message: "User registered successfully",
-      userId: result.insertedId.toString(),
-      userCode,
+      message: "Registration successful. Please check your email for the verification link."
     });
   } catch (error) {
     console.error("Registration error:", error);

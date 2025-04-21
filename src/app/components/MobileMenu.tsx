@@ -32,25 +32,39 @@ export default function MobileMenu({ isOpen, isDarkMode, onItemClick, navLinks, 
             key={link.href}
             href={link.href}
             onClick={onItemClick}
-            className={`block px-4 py-2 ${
+            className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
               isDarkMode 
-                ? 'text-white hover:bg-white/10' 
-                : 'text-gray-900 hover:bg-black/5'
+                ? 'text-white hover:bg-purple-700/40' 
+                : 'text-gray-900 hover:bg-purple-100'
             }`}
           >
             {link.label}
           </Link>
         ))}
+        {/* Add Settings link for mobile */}
+        {user && (
+          <Link
+            href="/settings"
+            onClick={onItemClick}
+            className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
+              isDarkMode 
+                ? 'text-white hover:bg-purple-700/40' 
+                : 'text-gray-900 hover:bg-purple-100'
+            }`}
+          >
+            Settings
+          </Link>
+        )}
         {user ? (
           <button
             onClick={() => {
               onLogout();
               onItemClick();
             }}
-            className={`block w-full text-left px-4 py-2 ${
+            className={`block w-full text-left px-4 py-2 rounded-lg transition-colors font-medium ${
               isDarkMode 
-                ? 'text-white hover:bg-white/10' 
-                : 'text-gray-900 hover:bg-black/5'
+                ? 'text-red-400 hover:bg-purple-700/40' 
+                : 'text-red-500 hover:bg-purple-100'
             }`}
           >
             Logout
@@ -59,10 +73,10 @@ export default function MobileMenu({ isOpen, isDarkMode, onItemClick, navLinks, 
           <Link
             href="/login"
             onClick={onItemClick}
-            className={`block px-4 py-2 ${
+            className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
               isDarkMode 
-                ? 'text-white hover:bg-white/10' 
-                : 'text-gray-900 hover:bg-black/5'
+                ? 'text-white hover:bg-purple-700/40' 
+                : 'text-gray-900 hover:bg-purple-100'
             }`}
           >
             Login

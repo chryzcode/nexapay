@@ -17,7 +17,7 @@ export async function GET() {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET) as {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
         userId: string;
         email: string;
       };
@@ -36,6 +36,8 @@ export async function GET() {
           email: user.email,
           username: user.username,
           isVerified: user.isVerified,
+          userCode: user.userCode,
+          fullname: user.fullname,
         },
       });
     } catch (error) {

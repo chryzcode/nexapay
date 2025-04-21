@@ -29,7 +29,6 @@ export default function Navbar() {
 
   // Navigation links array for reusability
   const navLinks = [
-    { href: "/", label: "Home" },
     { href: "/dashboard", label: "Dashboard" },
     { href: "/transactions", label: "Transactions" },
   ];

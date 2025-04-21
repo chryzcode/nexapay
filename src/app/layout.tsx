@@ -4,6 +4,9 @@ import "./globals.css";
 import { ThemeProvider } from './providers/ThemeProvider';
 import { AuthProvider } from '@/context/AuthContext';
 import Navbar from './components/Navbar';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 
 const inter = Inter({
   subsets: ["latin"],
@@ -23,13 +26,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        suppressHydrationWarning={true}
+        // suppressHydrationWarning={true}
         className={`${inter.variable} font-sans antialiased min-h-screen transition-colors`}
       >
         <AuthProvider>
           <ThemeProvider>
             <Navbar />
             {children}
+            <ToastContainer />
           </ThemeProvider>
         </AuthProvider>
       </body>

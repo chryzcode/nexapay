@@ -4,11 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
 import Link from "next/link";
+import { toast } from 'react-toastify';
 
 export default function Register() {
   const [username, setUsername] = useState("");
+  const [fullname, setFullname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [retypePassword, setRetypePassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
   const router = useRouter();
@@ -17,10 +20,18 @@ export default function Register() {
     e.preventDefault();
     setIsLoading(true);
 
+    if (password !== retypePassword) {
+      toast.error("Passwords do not match");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      await register(username, email, password);
+      await register(fullname, username, email, password);
+      toast.success('Registration successful! Please verify your email.');
       router.push("/verify-email");
-    } catch (error) {
+    } catch (error: any) {
+      toast.error(error.message || 'Registration failed. Please try again.');
       console.error("Registration failed:", error);
     } finally {
       setIsLoading(false);
@@ -37,20 +48,21 @@ export default function Register() {
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
+
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-400">
-                Username
+              <label htmlFor="fullname" className="block text-sm font-medium text-gray-400">
+                Full Name
               </label>
               <input
-                id="username"
-                name="username"
+                id="fullname"
+                name="fullname"
                 type="text"
-                autoComplete="username"
+                autoComplete="name"
                 required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={fullname}
+                onChange={(e) => setFullname(e.target.value)}
                 className="mt-1 block w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="Choose a username"
+                placeholder="Enter your full name"
               />
             </div>
 
@@ -72,6 +84,23 @@ export default function Register() {
             </div>
 
             <div>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-400">
+                Username
+              </label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="mt-1 block w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Choose a username"
+              />
+            </div>
+
+            <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-400">
                 Password
               </label>
@@ -87,11 +116,31 @@ export default function Register() {
                 placeholder="Create a password"
               />
             </div>
+
+            <div>
+              <label htmlFor="retype-password" className="block text-sm font-medium text-gray-400">
+                Retype Password
+              </label>
+              <input
+                id="retype-password"
+                name="retype-password"
+                type="password"
+                autoComplete="new-password"
+                required
+                value={retypePassword}
+                onChange={(e) => setRetypePassword(e.target.value)}
+                className="mt-1 block w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Retype your password"
+              />
+              {retypePassword && password !== retypePassword && (
+                <p className="text-red-400 text-xs mt-1">Passwords do not match</p>
+              )}
+            </div>
           </div>
 
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !password || !retypePassword || password !== retypePassword}
             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] hover:from-[#6B51EF] hover:to-[#9771FA] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? (
@@ -113,4 +162,4 @@ export default function Register() {
       </div>
     </div>
   );
-} 
+}

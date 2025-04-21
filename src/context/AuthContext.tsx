@@ -14,7 +14,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  register: (fullname: string, username: string, email: string, password: string) => Promise<any>;
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   verifyEmail: (token: string) => Promise<void>;
@@ -62,13 +62,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   };
 
-  const register = async (username: string, email: string, password: string) => {
+  const register = async (fullname: string, username: string, email: string, password: string) => {
     const response = await fetch("/api/auth/register", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ username, email, password }),
+      body: JSON.stringify({ fullname, username, email, password }),
     });
 
     if (!response.ok) {
@@ -77,7 +77,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await response.json();
-    setUser(data.user);
+    // Do not log in user until email is verified
+    // Optionally return the registration result (e.g., userCode)
+    return data;
   };
 
   const logout = async () => {

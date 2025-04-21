@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
 import Link from "next/link";
+import { toast } from 'react-toastify';
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -18,8 +19,10 @@ export default function Login() {
 
     try {
       await login(email, password);
+      toast.success('Login successful! Redirecting...');
       router.push("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
+      toast.error(error.message || 'Login failed. Please try again.');
       console.error("Login failed:", error);
     } finally {
       setIsLoading(false);

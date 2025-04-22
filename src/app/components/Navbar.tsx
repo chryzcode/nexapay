@@ -87,44 +87,42 @@ export default function Navbar() {
         {/* Only show navLinks not present in dropdown to avoid duplicates */}
         {user ? (
           <div className="flex items-center gap-4">
+            <div className="mr-1">
+              <ThemeToggle />
+            </div>
             {user.userCode && (
               <div className="flex items-center gap-2 relative group">
-                <span className="text-base font-bold font-mono bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-3 py-1 rounded-full">
-                  {user.userCode}
-                </span>
                 <button
-                  className="focus:outline-none flex items-center gap-1 px-2 py-1 rounded-lg transition-colors"
+                  className="focus:outline-none flex items-center px-0 py-0 rounded-lg"
                   tabIndex={0}
                   aria-haspopup="true"
                   aria-expanded={dropdownOpen}
                   onClick={() => setDropdownOpen((prev) => !prev)}
-                  onBlur={() => setDropdownOpen(false)}
+                  onBlur={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                      setDropdownOpen(false);
+                    }
+                  }}
                 >
-                  <svg
-                    width="18"
-                    height="18"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="transition-transform duration-200"
-                  >
-                    <circle cx="9" cy="9" r="8" />
-                    <path d="M6 9l2 2 4-4" />
-                  </svg>
-                  <span className="transition-transform duration-200 inline-block">▼</span>
+                  <span className="flex items-center text-base font-bold font-mono bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-3 py-1 rounded-full cursor-pointer">
+                    {user.userCode}
+                    <span className={`transition-transform duration-200 inline-block ml-2 ${dropdownOpen ? 'rotate-180' : ''} hover:text-purple-200 active:text-purple-300`}>
+                      ▼
+                    </span>
+                  </span>
                 </button>
                 <div
-                  className="absolute right-0 mt-2 min-w-[180px] max-w-xs rounded-xl shadow-xl border transition-all duration-200 z-[9999] flex flex-col py-2"
-                  style={{ right: 0, left: 'auto', top: 'calc(100% + 0.5rem)', opacity: dropdownOpen ? 1 : 0, pointerEvents: dropdownOpen ? 'auto' : 'none' }}
-                  tabIndex={-1}
-                  onMouseDown={e => e.preventDefault()}
+                  className={`absolute right-0 mt-2 min-w-[180px] max-w-xs rounded-xl shadow-xl border transition-all duration-200 z-[9999] flex flex-col py-2 ${
+                    isDarkMode 
+                      ? 'bg-[#18192b] border-white/10 text-white' 
+                      : 'bg-white border-gray-200 text-gray-900'
+                  } ${dropdownOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none'}`}
+                  style={{top: 'calc(100% + 0.5rem)', right: 0, left: 'auto'}}
                 >
-                  <Link href="/dashboard" className="block px-4 py-2 rounded-lg transition-colors font-medium">Dashboard</Link>
-                  <Link href="/transactions" className="block px-4 py-2 rounded-lg transition-colors font-medium">Transactions</Link>
-                  <Link href="/settings" className="block px-4 py-2 rounded-lg transition-colors font-medium">Settings</Link>
-                  <button onClick={handleLogout} className="w-full text-left block px-4 py-2 rounded-lg transition-colors font-medium">Logout</button>
+                  <button onMouseDown={() => { router.push('/dashboard'); setDropdownOpen(false); }} className="block w-full text-left px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">Dashboard</button>
+                  <button onMouseDown={() => { router.push('/transactions'); setDropdownOpen(false); }} className="block w-full text-left px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">Transactions</button>
+                  <button onMouseDown={() => { router.push('/settings'); setDropdownOpen(false); }} className="block w-full text-left px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">Settings</button>
+                  <button onMouseDown={() => { setDropdownOpen(false); handleLogout(); }} className="w-full text-left block px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">Logout</button>
                 </div>
               </div>
             )}
@@ -137,10 +135,6 @@ export default function Navbar() {
             Login
           </Link>
         )}
-        {/* Dark/Light Mode Toggle */}
-        <div className="ml-2">
-          <ThemeToggle />
-        </div>
       </nav>
       
       {/* Mobile Menu Button */}
@@ -167,9 +161,9 @@ export default function Navbar() {
               className="transition-transform duration-300"
             >
               {mobileMenuOpen ? (
-                <path d="M18 6L6 18M6 6l12 12" />
+                <path d="M18 6L6 18M6 6l12 12" className="hover:stroke-purple-500 active:stroke-purple-600" />
               ) : (
-                <path d="M3 12h18M3 6h18M3 18h18" />
+                <path d="M3 12h18M3 6h18M3 18h18" className="hover:stroke-purple-500 active:stroke-purple-600" />
               )}
             </svg>
           </button>

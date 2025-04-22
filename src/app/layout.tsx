@@ -26,8 +26,6 @@ export default function RootLayout({
         <AuthProvider>
           <ThemeProvider>
             <Navbar />
-            {/* Mask div to hide content under navbar */}
-            <div className="fixed top-0 left-0 w-full h-[72px] z-[9998] bg-white dark:bg-[#0B0F1A] pointer-events-none" />
             <main className="min-h-screen bg-inherit pt-[72px] pb-8 px-4 md:px-8 relative">
               {children}
             </main>

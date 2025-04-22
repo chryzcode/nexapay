@@ -173,7 +173,7 @@ export default function Navbar() {
           <AnimatePresence>
             {mobileMenuOpen && (
               <>
-                <div className="fixed inset-0 z-[9998] bg-black/50" onClick={() => setMobileMenuOpen(false)} />
+                {/* Removed overlay to prevent navbar darkening */}
                 <MobileMenu
                   isOpen={mobileMenuOpen}
                   onClose={() => setMobileMenuOpen(false)}

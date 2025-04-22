@@ -22,21 +22,13 @@ export default function MobileMenu({ isOpen, onClose, links, user, onLogout }: M
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          className="fixed inset-0 z-[9999] flex"
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-        >
-          {/* Overlay */}
-          <motion.div
-            className="absolute inset-0 bg-black/50"
-            onClick={onClose}
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-          />
+        <>
+          {/* Removed overlay for no blur/dark effect */}
 
-          {/* Side Drawer */}
+          {/* Side Drawer - now animates from top to bottom, positioned right and lower */}
           <motion.nav
-            className="relative ml-auto h-full w-3/4 max-w-xs bg-white dark:bg-gray-900 p-4 flex flex-col shadow-lg"
-            initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'tween', duration: 0.3 }}
+            className="fixed right-0 mt-5 w-[90vw] max-w-xs bg-white dark:bg-gray-900 p-4 flex flex-col shadow-lg rounded-b-xl z-[10000]"
+            initial={{ y: '-100%' }} animate={{ y: 0 }} exit={{ y: '-100%' }} transition={{ type: 'tween', duration: 0.3 }}
           >
             {links.map(link => (
               <button
@@ -47,6 +39,16 @@ export default function MobileMenu({ isOpen, onClose, links, user, onLogout }: M
                 {link.label}
               </button>
             ))}
+
+            {/* Add Settings if authenticated */}
+            {user && (
+              <button
+                onClick={() => navigate('/settings')}
+                className="py-2 px-3 text-left w-full transition-colors hover:bg-purple-50 dark:hover:bg-purple-900/20"
+              >
+                Settings
+              </button>
+            )}
 
             {user ? (
               <button
@@ -64,7 +66,7 @@ export default function MobileMenu({ isOpen, onClose, links, user, onLogout }: M
               </button>
             )}
           </motion.nav>
-        </motion.div>
+        </>
       )}
     </AnimatePresence>
   );

@@ -126,12 +126,15 @@ export default function Navbar() {
             )}
           </div>
         ) : (
-          <Link
-            href="/login"
-            className="px-4 py-2 rounded-lg transition-colors font-medium"
-          >
-            Login
-          </Link>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <Link
+              href="/login"
+              className="px-4 py-2 rounded-lg transition-colors font-medium"
+            >
+              Login
+            </Link>
+          </div>
         )}
       </nav>
       

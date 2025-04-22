@@ -30,8 +30,8 @@ export default function Navbar() {
 
   // Navigation links array for reusability
   const navLinks = [
-    { href: "/dashboard", label: "Dashboard" },
-    { href: "/transactions", label: "Transactions" },
+    { id: 'dashboard', href: "/dashboard", label: "Dashboard" },
+    { id: 'transactions', href: "/transactions", label: "Transactions" },
   ];
 
   // Close mobile menu when clicking outside
@@ -75,9 +75,9 @@ export default function Navbar() {
       
       {/* Desktop Navigation */}
       <nav className="hidden md:flex items-center gap-1">
-        {navLinks.filter((link) => link.href !== "/dashboard" && link.href !== "/transactions").map((link) => (
+        {navLinks.filter((link) => link.href !== "/dashboard" && link.href !== "/transactions").map((link, idx) => (
           <Link 
-            key={link.href}
+            key={link.href || link.label || idx}
             href={link.href}
             className="px-4 py-2 rounded-lg transition-colors font-medium"
           >
@@ -92,6 +92,7 @@ export default function Navbar() {
             </div>
             {user.userCode && (
               <div className="flex items-center gap-2 relative group">
+                {/* User Dropdown only for desktop */}
                 <button
                   className="focus:outline-none flex items-center px-0 py-0 rounded-lg"
                   tabIndex={0}
@@ -99,24 +100,21 @@ export default function Navbar() {
                   aria-expanded={dropdownOpen}
                   onClick={() => setDropdownOpen((prev) => !prev)}
                   onBlur={(e) => {
-                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                    // Only close dropdown if focus moves outside
+                    if (!e.currentTarget.contains(e.relatedTarget)) {
                       setDropdownOpen(false);
                     }
                   }}
                 >
-                  <span className="flex items-center text-base font-bold font-mono bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-3 py-1 rounded-full cursor-pointer">
-                    {user.userCode}
-                    <span className={`transition-transform duration-200 inline-block ml-2 ${dropdownOpen ? 'rotate-180' : ''} hover:text-purple-200 active:text-purple-300`}>
-                      ▼
-                    </span>
-                  </span>
+                  <span className="font-semibold mr-1">{user.userCode}</span>
+                  <svg className={`w-4 h-4 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
                 </button>
-                <div
-                  className={`absolute right-0 mt-2 min-w-[180px] max-w-xs rounded-xl shadow-xl border transition-all duration-200 z-[9999] flex flex-col py-2 ${
-                    isDarkMode 
-                      ? 'bg-[#18192b] border-white/10 text-white' 
-                      : 'bg-white border-gray-200 text-gray-900'
-                  } ${dropdownOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none'}`}
+                {/* Dropdown menu - only visible on desktop */}
+                <div className={`absolute right-0 mt-2 min-w-[180px] max-w-xs rounded-xl shadow-xl border transition-all duration-200 z-[9999] flex flex-col py-2 ${
+                  isDarkMode 
+                    ? 'bg-[#18192b] border-white/10 text-white' 
+                    : 'bg-white border-gray-200 text-gray-900'
+                } ${dropdownOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none'} hidden md:flex`}
                   style={{top: 'calc(100% + 0.5rem)', right: 0, left: 'auto'}}
                 >
                   <button onMouseDown={() => { router.push('/dashboard'); setDropdownOpen(false); }} className="block w-full text-left px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">Dashboard</button>
@@ -171,17 +169,16 @@ export default function Navbar() {
           {/* Mobile Menu */}
           <AnimatePresence>
             {mobileMenuOpen && (
-              <div className="fixed inset-0 z-[9998] bg-black/50" onClick={() => setMobileMenuOpen(false)} />
-            )}
-            {mobileMenuOpen && (
-              <MobileMenu 
-                isOpen={mobileMenuOpen}
-                isDarkMode={isDarkMode}
-                onItemClick={handleMobileMenuItemClick}
-                navLinks={navLinks}
-                user={user}
-                onLogout={handleLogout}
-              />
+              <>
+                <div className="fixed inset-0 z-[9998] bg-black/50" onClick={() => setMobileMenuOpen(false)} />
+                <MobileMenu
+                  isOpen={mobileMenuOpen}
+                  onClose={() => setMobileMenuOpen(false)}
+                  links={navLinks}
+                  user={user}
+                  onLogout={handleLogout}
+                />
+              </>
             )}
           </AnimatePresence>
         </div>

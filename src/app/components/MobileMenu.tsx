@@ -1,88 +1,71 @@
 "use client";
 
-import { motion } from "framer-motion";
-import Link from "next/link";
-import { useTheme } from "../providers/ThemeProvider";
+import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
+interface NavLink { id: string; href: string; label: string }
 interface MobileMenuProps {
   isOpen: boolean;
-  isDarkMode: boolean;
-  onItemClick: () => void;
-  navLinks: { href: string; label: string }[];
+  onClose: () => void;
+  links: NavLink[];
   user: any;
-  onLogout: () => void;
+  onLogout: () => Promise<void>;
 }
 
-export default function MobileMenu({ isOpen, isDarkMode, onItemClick, navLinks, user, onLogout }: MobileMenuProps) {
+export default function MobileMenu({ isOpen, onClose, links, user, onLogout }: MobileMenuProps) {
+  const router = useRouter();
+  const navigate = async (href: string) => {
+    onClose();
+    await router.push(href);
+  };
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.2 }}
-      className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg ${
-        isDarkMode 
-          ? 'bg-[#1A1E2C] border border-white/10' 
-          : 'bg-white border border-gray-200'
-      }`}
-    >
-      <div className="py-1">
-        {navLinks.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            onClick={onItemClick}
-            className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
-              isDarkMode 
-                ? 'text-white hover:bg-purple-700/40' 
-                : 'text-gray-900 hover:bg-purple-100'
-            }`}
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-[9999] flex"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+        >
+          {/* Overlay */}
+          <motion.div
+            className="absolute inset-0 bg-black/50"
+            onClick={onClose}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+          />
+
+          {/* Side Drawer */}
+          <motion.nav
+            className="relative ml-auto h-full w-3/4 max-w-xs bg-white dark:bg-gray-900 p-4 flex flex-col shadow-lg"
+            initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'tween', duration: 0.3 }}
           >
-            {link.label}
-          </Link>
-        ))}
-        {/* Add Settings link for mobile */}
-        {user && (
-          <Link
-            href="/settings"
-            onClick={onItemClick}
-            className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
-              isDarkMode 
-                ? 'text-white hover:bg-purple-700/40' 
-                : 'text-gray-900 hover:bg-purple-100'
-            }`}
-          >
-            Settings
-          </Link>
-        )}
-        {user ? (
-          <button
-            onClick={() => {
-              onLogout();
-              onItemClick();
-            }}
-            className={`block w-full text-left px-4 py-2 rounded-lg transition-colors font-medium ${
-              isDarkMode 
-                ? 'text-red-400 hover:bg-purple-700/40' 
-                : 'text-red-500 hover:bg-purple-100'
-            }`}
-          >
-            Logout
-          </button>
-        ) : (
-          <Link
-            href="/login"
-            onClick={onItemClick}
-            className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
-              isDarkMode 
-                ? 'text-white hover:bg-purple-700/40' 
-                : 'text-gray-900 hover:bg-purple-100'
-            }`}
-          >
-            Login
-          </Link>
-        )}
-      </div>
-    </motion.div>
+            {links.map(link => (
+              <button
+                key={link.id}
+                onClick={() => navigate(link.href)}
+                className="py-2 px-3 text-left w-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                {link.label}
+              </button>
+            ))}
+
+            {user ? (
+              <button
+                onClick={async () => { onClose(); await onLogout(); }}
+                className="py-2 px-3 text-left w-full text-red-500 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                Logout
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate('/login')}
+                className="py-2 px-3 text-left w-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                Login
+              </button>
+            )}
+          </motion.nav>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
-} 
+}

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
@@ -20,9 +22,14 @@ export async function GET() {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET) as {
-        userId: string;
-      };
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+      if (!decoded || typeof decoded !== "object" || !("userId" in decoded)) {
+        return NextResponse.json(
+          { error: "Invalid token" },
+          { status: 401 }
+        );
+      }
+      const { userId } = decoded as { userId: string };
 
       const client = await db;
       const transactions = client.db().collection("transactions");
@@ -30,8 +37,8 @@ export async function GET() {
       const userTransactions = await transactions
         .find({
           $or: [
-            { senderId: new ObjectId(decoded.userId) },
-            { recipientId: new ObjectId(decoded.userId) },
+            { senderId: new ObjectId(userId) },
+            { recipientId: new ObjectId(userId) },
           ],
         })
         .sort({ createdAt: -1 })
@@ -75,9 +82,14 @@ export async function POST(request: Request) {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET) as {
-        userId: string;
-      };
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+      if (!decoded || typeof decoded !== "object" || !("userId" in decoded)) {
+        return NextResponse.json(
+          { error: "Invalid token" },
+          { status: 401 }
+        );
+      }
+      const { userId } = decoded as { userId: string };
 
       const { amount, recipientId, type } = await request.json();
 
@@ -109,7 +121,7 @@ export async function POST(request: Request) {
         amount,
         type,
         status: "pending",
-        senderId: new ObjectId(decoded.userId),
+        senderId: new ObjectId(userId),
         recipientId: new ObjectId(recipientId),
         createdAt: new Date(),
         updatedAt: new Date(),

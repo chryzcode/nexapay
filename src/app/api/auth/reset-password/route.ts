@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import db from "@/lib/db";
@@ -56,4 +58,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-} 
+}

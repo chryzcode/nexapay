@@ -13,7 +13,8 @@ export default function VerifyEmail() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const token = searchParams.get("token");
+    // Defensive: searchParams may be null
+    const token = searchParams?.get("token");
     if (!token) {
       setIsLoading(false);
       return;

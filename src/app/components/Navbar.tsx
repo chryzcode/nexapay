@@ -3,28 +3,35 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import MobileMenu from "./MobileMenu";
-import ThemeToggle from "./ThemeToggle";
+import { ThemeToggle } from "./ThemeToggle";
+import { useTheme } from "../providers/ThemeProvider";
+import { useAuth } from "@/context/AuthContext";
 
-type NavbarProps = {
-  isDarkMode: boolean;
-  toggleTheme: () => void;
-};
-
-export default function Navbar({ isDarkMode, toggleTheme }: NavbarProps) {
+export default function Navbar() {
+  const { isDarkMode } = useTheme();
+  const { user, logout } = useAuth();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLDivElement>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // Handle mobile menu item click
   const handleMobileMenuItemClick = () => {
     setMobileMenuOpen(false);
   };
 
+  // Handle logout
+  const handleLogout = async () => {
+    await logout();
+    router.push('/');
+  };
+
   // Navigation links array for reusability
   const navLinks = [
-    { href: "#features", label: "Features" },
-    { href: "#how-it-works", label: "How It Works" },
-    { href: "#signin", label: "Sign In" },
+    { id: 'dashboard', href: "/dashboard", label: "Dashboard" },
+    { id: 'transactions', href: "/transactions", label: "Transactions" },
   ];
 
   // Close mobile menu when clicking outside
@@ -58,46 +65,87 @@ export default function Navbar({ isDarkMode, toggleTheme }: NavbarProps) {
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className={`flex justify-between items-center backdrop-blur-md py-4 px-6 rounded-xl ${
-        isDarkMode 
-          ? 'border border-white/10 bg-black/30 shadow-lg shadow-black/10' 
-          : 'border border-gray-200 bg-white/90 shadow-lg shadow-black/5'
-      } sticky top-4 z-50`}
+      className={`flex justify-between items-center py-4 px-6 rounded-xl sticky top-4 z-[9999]
+        ${isDarkMode 
+          ? 'bg-[#18192b] border border-white/10 text-white'
+          : 'bg-white/90 border border-gray-200 text-gray-900'}
+        backdrop-blur-sm transition-colors duration-300`}
     >
-      <h1 className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-[#7B61FF] to-[#A78BFA]">NexaPay</h1>
+      <Link href="/" className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-[#7B61FF] to-[#A78BFA]">NexaPay</Link>
       
       {/* Desktop Navigation */}
       <nav className="hidden md:flex items-center gap-1">
-        {navLinks.map((link) => (
+        {navLinks.filter((link) => link.href !== "/dashboard" && link.href !== "/transactions").map((link, idx) => (
           <Link 
-            key={link.href}
+            key={link.href || link.label || idx}
             href={link.href}
-            className={`${
-              isDarkMode ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-black/5'
-            } px-4 py-2 rounded-lg transition-colors font-medium`}
+            className="px-4 py-2 rounded-lg transition-colors font-medium"
           >
             {link.label}
           </Link>
         ))}
-        
-        {/* Dark/Light Mode Toggle */}
-        <div className="ml-2">
-          <ThemeToggle isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
-        </div>
+        {/* Only show navLinks not present in dropdown to avoid duplicates */}
+        {user ? (
+          <div className="flex items-center gap-4">
+            <div className="mr-1">
+              <ThemeToggle />
+            </div>
+            {user.userCode && (
+              <div className="flex items-center gap-2 relative group">
+                {/* User Dropdown only for desktop */}
+                <button
+                  className="focus:outline-none flex items-center px-0 py-0 rounded-lg"
+                  tabIndex={0}
+                  aria-haspopup="true"
+                  aria-expanded={dropdownOpen}
+                  onClick={() => setDropdownOpen((prev) => !prev)}
+                  onBlur={(e) => {
+                    // Only close dropdown if focus moves outside
+                    if (!e.currentTarget.contains(e.relatedTarget)) {
+                      setDropdownOpen(false);
+                    }
+                  }}
+                >
+                  <span className="font-semibold mr-1">{user.userCode}</span>
+                  <svg className={`w-4 h-4 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                {/* Dropdown menu - only visible on desktop */}
+                <div className={`absolute right-0 mt-2 min-w-[180px] max-w-xs rounded-xl shadow-xl border transition-all duration-200 z-[9999] flex flex-col py-2 ${
+                  isDarkMode 
+                    ? 'bg-[#18192b] border-white/10 text-white' 
+                    : 'bg-white border-gray-200 text-gray-900'
+                } ${dropdownOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none'} hidden md:flex`}
+                  style={{top: 'calc(100% + 0.5rem)', right: 0, left: 'auto'}}
+                >
+                  <button onMouseDown={() => { router.push('/dashboard'); setDropdownOpen(false); }} className="block w-full text-left px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">Dashboard</button>
+                  <button onMouseDown={() => { router.push('/transactions'); setDropdownOpen(false); }} className="block w-full text-left px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">Transactions</button>
+                  <button onMouseDown={() => { router.push('/settings'); setDropdownOpen(false); }} className="block w-full text-left px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">Settings</button>
+                  <button onMouseDown={() => { setDropdownOpen(false); handleLogout(); }} className="w-full text-left block px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">Logout</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <Link
+              href="/login"
+              className="px-4 py-2 rounded-lg transition-colors font-medium"
+            >
+              Login
+            </Link>
+          </div>
+        )}
       </nav>
       
       {/* Mobile Menu Button */}
       <div className="md:hidden flex items-center gap-3" ref={menuButtonRef}>
         {/* Dark/Light Mode Toggle for Mobile */}
-        <ThemeToggle isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
+        <ThemeToggle />
         
         <div className="relative">
           <button 
-            className={`relative z-50 p-2 rounded-lg ${
-              isDarkMode 
-                ? mobileMenuOpen ? 'bg-white/10' : 'hover:bg-white/10' 
-                : mobileMenuOpen ? 'bg-black/10' : 'hover:bg-black/5'
-            } transition-colors`}
+            className="relative z-50 p-2 rounded-lg transition-colors"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
           >
@@ -107,16 +155,16 @@ export default function Navbar({ isDarkMode, toggleTheme }: NavbarProps) {
               height="24" 
               viewBox="0 0 24 24" 
               fill="none" 
-              stroke={isDarkMode ? "white" : "#111827"}
+              stroke="currentColor"
               strokeWidth="2" 
               strokeLinecap="round" 
               strokeLinejoin="round"
-              className={`transition-transform duration-300 ${mobileMenuOpen ? 'rotate-90' : ''}`}
+              className="transition-transform duration-300"
             >
               {mobileMenuOpen ? (
-                <path d="M18 6L6 18M6 6l12 12" />
+                <path d="M18 6L6 18M6 6l12 12" className="hover:stroke-purple-500 active:stroke-purple-600" />
               ) : (
-                <path d="M3 12h18M3 6h18M3 18h18" />
+                <path d="M3 12h18M3 6h18M3 18h18" className="hover:stroke-purple-500 active:stroke-purple-600" />
               )}
             </svg>
           </button>
@@ -124,12 +172,16 @@ export default function Navbar({ isDarkMode, toggleTheme }: NavbarProps) {
           {/* Mobile Menu */}
           <AnimatePresence>
             {mobileMenuOpen && (
-              <MobileMenu 
-                isOpen={mobileMenuOpen}
-                isDarkMode={isDarkMode}
-                onItemClick={handleMobileMenuItemClick}
-                navLinks={navLinks}
-              />
+              <>
+                {/* Removed overlay to prevent navbar darkening */}
+                <MobileMenu
+                  isOpen={mobileMenuOpen}
+                  onClose={() => setMobileMenuOpen(false)}
+                  links={navLinks}
+                  user={user}
+                  onLogout={handleLogout}
+                />
+              </>
             )}
           </AnimatePresence>
         </div>

@@ -1,36 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { Montserrat } from "next/font/google";
-import Navbar from "./components/Navbar";
+import { useTheme } from "./providers/ThemeProvider";
 
 export default function Home() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
-
-  useEffect(() => {
-    // Check if user has a preference stored
-    const storedTheme = localStorage.getItem('theme');
-    if (storedTheme) {
-      setIsDarkMode(storedTheme === 'dark');
-    } else {
-      // Check for system preference
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setIsDarkMode(prefersDark);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Apply the theme whenever isDarkMode changes
-    document.documentElement.classList.toggle('dark-mode', isDarkMode);
-    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
-  }, [isDarkMode]);
-
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-  };
+  const { isDarkMode } = useTheme();
 
   const supportedCryptocurrencies = [
     { name: "Bitcoin", symbol: "BTC" },
@@ -40,18 +17,15 @@ export default function Home() {
   ];
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-[#0B0F1A] text-[#F9F9FB]' : 'bg-[#F9F9FB] text-[#111827]'} p-8 md:p-16 relative overflow-hidden`}>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-[#0B0F1A] text-[#F9F9FB]' : 'bg-[#F9F9FB] text-[#111827]'} relative overflow-hidden`}>
       {/* Background gradient element - reduce opacity for better contrast */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
         <div className={`absolute -top-[30%] -left-[10%] w-[50%] h-[50%] ${isDarkMode ? 'bg-[#7B61FF]/10' : 'bg-[#7B61FF]/5'} rounded-full blur-[120px]`}></div>
         <div className={`absolute top-[60%] -right-[10%] w-[40%] h-[40%] ${isDarkMode ? 'bg-[#7B61FF]/5' : 'bg-[#7B61FF]/5'} rounded-full blur-[120px]`}></div>
       </div>
 
-      {/* Navbar Component */}
-      <Navbar isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
-
       {/* Hero */}
-      <section className="mt-12 md:mt-20 grid md:grid-cols-2 gap-12 items-center">
+      <section className="pt-24 md:pt-32 px-8 md:px-16 grid md:grid-cols-2 gap-12 items-center">
         <motion.div
           initial={{ x: -50, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
@@ -88,7 +62,7 @@ export default function Home() {
         >
           {/* Desktop image - hidden on mobile, shown on md screens and up */}
           <div className="hidden md:block relative">
-        <Image
+            <Image
               src="/dashboard-preview.png"
               alt="NexaPay Dashboard Preview"
               width={650}
@@ -141,12 +115,10 @@ export default function Home() {
         </motion.div>
       </section>
 
-    
-
       {/* Features */}
       <motion.section 
         id="features" 
-        className="mt-20"
+        className="px-8 md:px-16 py-20"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
@@ -207,7 +179,7 @@ export default function Home() {
       {/* How It Works */}
       <motion.section 
         id="how-it-works" 
-        className="mt-20"
+        className="px-8 md:px-16 py-20"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
@@ -254,7 +226,7 @@ export default function Home() {
 
       {/* Testimonials */}
       <motion.section
-        className="mt-20"
+        className="px-8 md:px-16 py-20"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
@@ -323,7 +295,7 @@ export default function Home() {
       
       {/* FAQ Section */}
       <motion.section
-        className="mt-20"
+        className="px-8 md:px-16 py-20"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
@@ -375,49 +347,51 @@ export default function Home() {
 
       {/* CTA Section */}
       <motion.section
-        className="mt-20 py-16 px-6 relative overflow-hidden rounded-xl shadow-xl"
+        className="px-8 md:px-16 py-20"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
         viewport={{ once: true, amount: 0.3 }}
       >
-        <div className={`absolute inset-0 ${isDarkMode 
-          ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/50' 
-          : 'bg-gradient-to-r from-purple-500/30 to-indigo-500/30'} backdrop-blur-sm`}></div>
-        <div className="relative z-10 max-w-6xl mx-auto">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4 text-center">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#7B61FF] to-[#A78BFA]">
-              Ready to Transform Your Payment Experience?
-            </span>
-          </h2>
-          <p className={`text-center text-xl ${isDarkMode ? 'text-gray-200' : 'text-gray-800'} mb-10 max-w-3xl mx-auto font-medium`}>
-            Start accepting crypto payments today and unlock global commerce potential with NexaPay
-          </p>
-          <div className="flex flex-col md:flex-row justify-center items-center gap-6">
-            <motion.button
-              className="bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white py-3 px-8 rounded-full font-medium hover:from-[#6B51EF] hover:to-[#9771FA] shadow-lg shadow-purple-900/20"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Start for Free
-            </motion.button>
+        <div className="relative overflow-hidden rounded-xl shadow-xl">
+          <div className={`absolute inset-0 ${isDarkMode 
+            ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/50' 
+            : 'bg-gradient-to-r from-purple-500/30 to-indigo-500/30'} backdrop-blur-sm`}></div>
+          <div className="relative z-10 max-w-6xl mx-auto py-16 px-6">
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 text-center">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#7B61FF] to-[#A78BFA]">
+                Ready to Transform Your Payment Experience?
+              </span>
+            </h2>
+            <p className={`text-center text-xl ${isDarkMode ? 'text-gray-200' : 'text-gray-800'} mb-10 max-w-3xl mx-auto font-medium`}>
+              Start accepting crypto payments today and unlock global commerce potential with NexaPay
+            </p>
+            <div className="flex flex-col md:flex-row justify-center items-center gap-6">
+              <motion.button
+                className="bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white py-3 px-8 rounded-full font-medium hover:from-[#6B51EF] hover:to-[#9771FA] shadow-lg shadow-purple-900/20"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Start for Free
+              </motion.button>
+            </div>
           </div>
         </div>
       </motion.section>
 
 
       {/* Footer */}
-      <footer className="mt-20 border-t border-[#2D2F36] pt-8">
+      <footer className="px-8 md:px-16 py-12 border-t border-[#2D2F36]">
         <div className="flex flex-col md:flex-row justify-between items-center">
           <div className="mb-6 md:mb-0">
             <div className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#7B61FF] to-[#A78BFA]">NexaPay</div>
             <p className="text-gray-400 mt-2">© 2024 NexaPay. All rights reserved.</p>
           </div>
           <div className="flex space-x-8">
-          <a href="#" className="text-gray-400 hover:text-white">Email</a>
-          <a href="#" className="text-gray-400 hover:text-white">Twitter</a>
-          <a href="#" className="text-gray-400 hover:text-white">Linkedin</a>
-          <a href="#" className="text-gray-400 hover:text-white">Contact</a>
+            <a href="#" className="text-gray-400 hover:text-white">Email</a>
+            <a href="#" className="text-gray-400 hover:text-white">Twitter</a>
+            <a href="#" className="text-gray-400 hover:text-white">Linkedin</a>
+            <a href="#" className="text-gray-400 hover:text-white">Contact</a>
           </div>
         </div>
       </footer>

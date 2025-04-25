@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from './providers/ThemeProvider';
 import { AuthProvider } from '@/context/AuthContext';
+import { WalletProvider } from "@/context/WalletContext";
 import Navbar from './components/Navbar';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -25,11 +26,25 @@ export default function RootLayout({
       >
         <AuthProvider>
           <ThemeProvider>
-            <Navbar />
-            <main className="min-h-screen bg-inherit pt-[72px] pb-8 px-4 md:px-8 relative">
-              {children}
-            </main>
-            <ToastContainer />
+            <WalletProvider>
+              <Navbar />
+              <main className="min-h-screen bg-inherit pt-[72px] pb-8 px-4 md:px-8 relative">
+                {children}
+              </main>
+              {/* ToastContainer must be rendered here for all client-side toasts */}
+              <ToastContainer
+                position="top-right"
+                autoClose={4000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="colored"
+              />
+            </WalletProvider>
           </ThemeProvider>
         </AuthProvider>
       </body>

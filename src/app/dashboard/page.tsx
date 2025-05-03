@@ -115,13 +115,13 @@ export default function Dashboard() {
 
   return (
     <div className={`relative min-h-screen px-2 md:px-6 py-8 flex flex-col items-center ${isDarkMode ? 'bg-[#10111b]' : 'bg-gradient-to-br from-[#f9f9fb] via-[#e7e7f6] to-[#f2e6ff]'}`}>
-      <h1 className={`text-4xl font-extrabold mb-8 tracking-tight text-center ${isDarkMode ? 'text-white' : 'text-[#1a1445]'}`}>Welcome to NexaPay</h1>
+      <h1 className={`text-4xl font-extrabold mb-8 tracking-tight text-center ${isDarkMode ? 'text-white' : 'text-[#1a1445]'}`}>Dashboard</h1>
       {/* Cards Section: Balance | Quick Actions | Transactions */}
       <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch mb-10">
         <AnimatePresence>
           {/* Balance Card */}
           <motion.div
-            className="rounded-3xl glass-card shadow-2xl border border-white/20 p-5 flex flex-col items-center justify-center relative overflow-hidden"
+            className="rounded-3xl bg-white dark:bg-[#18192b] shadow-2xl border border-white/20 p-5 flex flex-col items-center justify-center relative overflow-hidden"
             initial="hidden"
             animate="visible"
             variants={cardVariants}
@@ -141,9 +141,9 @@ export default function Dashboard() {
             )}
           </motion.div>
 
-          {/* Quick Actions - move to center */}
+          {/* Quick Actions */}
           <motion.div
-            className="rounded-3xl glass-card shadow-2xl border border-white/20 p-5 flex flex-col justify-center relative overflow-hidden"
+            className="rounded-3xl bg-white dark:bg-[#18192b] shadow-2xl border border-white/20 p-5 flex flex-col items-center justify-center relative overflow-hidden"
             initial="hidden"
             animate="visible"
             variants={cardVariants}
@@ -152,16 +152,16 @@ export default function Dashboard() {
             style={{ minHeight: 140 }}
           >
             <div className="absolute -top-8 -right-8 w-32 h-32 bg-gradient-to-br from-[#A78BFA]/30 to-[#7B61FF]/10 rounded-full blur-2xl opacity-60"></div>
-            <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2"><FaArrowUp className="text-[#7B61FF]" /> Quick Actions</h2>
-            <div className="flex flex-col gap-4">
+            <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2 justify-center"><FaArrowUp className="text-[#7B61FF]" /> Quick Actions</h2>
+            <div className="flex flex-col gap-4 w-full items-center">
               <button
-                className="w-full flex items-center gap-3 bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white py-3 px-6 rounded-2xl font-semibold text-lg shadow-lg hover:from-[#6B51EF] hover:to-[#9771FA] transition-all focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/40"
+                className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white py-3 px-6 rounded-2xl font-semibold text-lg shadow-lg hover:from-[#6B51EF] hover:to-[#9771FA] transition-all focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/40"
                 onClick={() => setShowPaymentModal(true)}
               >
                 <FaArrowUp className="w-6 h-6" /> Send Money
               </button>
               <button
-                className="w-full flex items-center gap-3 bg-gradient-to-r from-[#A78BFA] to-[#7B61FF] text-white py-3 px-6 rounded-2xl font-semibold text-lg shadow-lg hover:from-[#9771FA] hover:to-[#6B51EF] transition-all focus:outline-none focus:ring-2 focus:ring-[#A78BFA]/40"
+                className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-[#A78BFA] to-[#7B61FF] text-white py-3 px-6 rounded-2xl font-semibold text-lg shadow-lg hover:from-[#9771FA] hover:to-[#6B51EF] transition-all focus:outline-none focus:ring-2 focus:ring-[#A78BFA]/40"
                 onClick={() => setShowRequestModal(true)}
               >
                 <FaArrowDown className="w-6 h-6" /> Request Money
@@ -169,9 +169,9 @@ export default function Dashboard() {
             </div>
           </motion.div>
 
-          {/* Transactions Card - move to right */}
+          {/* Transactions Card */}
           <motion.div
-            className="rounded-3xl glass-card shadow-2xl border border-white/20 p-5 flex flex-col justify-center relative overflow-hidden"
+            className="rounded-3xl bg-white dark:bg-[#18192b] shadow-2xl border border-white/20 p-5 flex flex-col justify-center relative overflow-hidden"
             initial="hidden"
             animate="visible"
             variants={cardVariants}
@@ -179,7 +179,7 @@ export default function Dashboard() {
             exit="hidden"
             style={{ minHeight: 140 }}
           >
-            <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-gradient-to-br from-[#7B61FF]/20 to-[#A78BFA]/10 rounded-full blur-2xl opacity-60"></div>
+            <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-gradient-to-br from-[#A78BFA]/30 to-[#7B61FF]/10 rounded-full blur-2xl opacity-60"></div>
             <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2"><FaMoneyBillWave className="text-[#A78BFA]" /> Recent Transactions</h2>
             <div className="flex-1 flex flex-col items-center justify-center">
               <svg width="48" height="48" fill="none" className="mb-2 opacity-40"><rect width="48" height="48" rx="24" fill="#A78BFA" fillOpacity="0.13"/><path d="M16 24h16M24 16v16" stroke="#7B61FF" strokeWidth="2.5" strokeLinecap="round"/></svg>

@@ -114,10 +114,11 @@ export default function Dashboard() {
   }
 
   return (
-    <div className={`relative min-h-screen px-2 md:px-6 py-8 flex flex-col items-center ${isDarkMode ? 'bg-[#10111b]' : 'bg-gradient-to-br from-[#f9f9fb] via-[#e7e7f6] to-[#f2e6ff]'}`}>
+    <div className={`relative min-h-screen px-4 sm:px-8 md:px-16 py-8 flex flex-col items-center ${isDarkMode ? 'bg-[#10111b]' : 'bg-gradient-to-br from-[#f9f9fb] via-[#e7e7f6] to-[#f2e6ff]'}`}>
+      {/* Navbar blur overlay removed since header backdrop-blur-sm is used */}
       <h1 className={`text-4xl font-extrabold mb-8 tracking-tight text-center ${isDarkMode ? 'text-white' : 'text-[#1a1445]'}`}>Dashboard</h1>
       {/* Cards Section: Balance | Quick Actions | Transactions */}
-      <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch mb-10">
+      <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch mb-10">
         <AnimatePresence>
           {/* Balance Card */}
           <motion.div
@@ -131,9 +132,9 @@ export default function Dashboard() {
           >
             <div className="absolute -top-8 -left-8 w-32 h-32 bg-gradient-to-br from-[#7B61FF]/30 to-[#A78BFA]/20 rounded-full blur-2xl opacity-60"></div>
             <FaWallet className="text-5xl mb-3 text-[#7B61FF] drop-shadow-lg" />
-            <div className="text-5xl font-bold mb-2 tracking-tight">${usdTotal} <span className="text-lg font-medium text-gray-400">USD</span></div>
-            <div className="text-lg font-mono text-gray-400">{ethBalance} ETH</div>
-            {account && <div className="mt-4 text-xs text-gray-400 font-mono break-all">Connected: {account}</div>}
+            <div className="text-3xl md:text-5xl font-bold mb-2 tracking-tight">${usdTotal} <span className="text-base md:text-lg font-medium text-gray-400">USD</span></div>
+            <div className="text-base md:text-lg font-mono text-gray-400">{ethBalance} ETH</div>
+            {account && <div className="mt-4 text-xs text-gray-400 font-mono break-all md:break-normal truncate max-w-[90vw] md:max-w-none">Connected: {account}</div>}
             {!account && (
               <div className="flex justify-end mt-4 w-full">
                 {typeof window !== "undefined" && <WalletConnect />}
@@ -143,7 +144,7 @@ export default function Dashboard() {
 
           {/* Quick Actions */}
           <motion.div
-            className="rounded-3xl bg-white dark:bg-[#18192b] shadow-2xl border border-white/20 p-5 flex flex-col items-center justify-center relative overflow-hidden"
+            className="rounded-3xl bg-white dark:bg-[#18192b] shadow-2xl border border-white/20 p-3 md:p-5 flex flex-col items-center justify-center relative overflow-hidden"
             initial="hidden"
             animate="visible"
             variants={cardVariants}
@@ -171,7 +172,7 @@ export default function Dashboard() {
 
           {/* Transactions Card */}
           <motion.div
-            className="rounded-3xl bg-white dark:bg-[#18192b] shadow-2xl border border-white/20 p-5 flex flex-col justify-center relative overflow-hidden"
+            className="rounded-3xl bg-white dark:bg-[#18192b] shadow-2xl border border-white/20 p-3 md:p-5 flex flex-col justify-center relative overflow-hidden"
             initial="hidden"
             animate="visible"
             variants={cardVariants}
@@ -190,7 +191,7 @@ export default function Dashboard() {
       </div>
 
       {/* Requests Dashboard and Analytics - stacked vertically, no glassmorphism */}
-      <div className="w-full max-w-5xl flex flex-col gap-8 items-stretch mt-2 mb-16">
+      <div className="w-full max-w-7xl flex flex-col gap-8 items-stretch mt-2 mb-16">
         <motion.div
           className="rounded-3xl bg-white dark:bg-[#18192b] shadow-2xl border border-white/20 flex flex-col justify-start relative overflow-hidden p-0"
           initial="hidden"

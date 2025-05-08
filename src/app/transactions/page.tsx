@@ -60,7 +60,7 @@ export default function Transactions() {
   }
 
   return (
-    <div className={`container mx-auto px-20 py-16 min-h-screen ${isDarkMode ? 'bg-[#0B0F1A]' : 'bg-[#F9F9FB]'}`}>
+    <div className={`container mx-auto px-4 md:px-20 py-16 min-h-screen ${isDarkMode ? 'bg-[#0B0F1A]' : 'bg-[#F9F9FB]'}`}>
       <div className="flex justify-between items-center mb-12">
         <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-[#F9F9FB]' : 'text-[#111827]'}`}>Transactions</h1>
         <div className="flex gap-3">
@@ -77,26 +77,28 @@ export default function Transactions() {
           </select>
         </div>
       </div>
-      <div className={`bg-white/5 backdrop-blur-lg rounded-xl border border-white/10 overflow-hidden ${isDarkMode ? '' : 'bg-white border-gray-200 shadow-md'}`}
-        style={{ padding: '2.5rem 2rem' }}>
-        <div className={`grid grid-cols-4 gap-8 text-gray-400 font-medium mb-8 ${isDarkMode ? 'text-[#F9F9FB]' : 'text-[#111827]'}`}> 
-          <div>Date</div>
-          <div>Description</div>
-          <div>Amount</div>
-          <div>Status</div>
+      <div className="overflow-x-auto">
+        <div className={`bg-white/5 backdrop-blur-lg rounded-xl border border-white/10 overflow-hidden ${isDarkMode ? '' : 'bg-white border-gray-200 shadow-md'}`}
+          style={{ padding: '2.5rem 2rem' }}>
+          <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-gray-400 font-medium mb-8 ${isDarkMode ? 'text-[#F9F9FB]' : 'text-[#111827]'}`}> 
+            <div>Date</div>
+            <div>Description</div>
+            <div>Amount</div>
+            <div>Status</div>
+          </div>
+          {filtered.length === 0 ? (
+            <div className={`text-center py-16 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No transactions found</div>
+          ) : (
+            filtered.map((tx, idx) => (
+              <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 items-center py-5 border-b last:border-b-0 border-gray-100 dark:border-[#232946]">
+                <div>{new Date(tx.createdAt).toLocaleDateString()}</div>
+                <div>{tx.type === 'sent' ? `To ${tx.recipient}` : `From ${tx.sender}`}</div>
+                <div className="font-semibold">${tx.amount}</div>
+                <div className={`capitalize font-medium ${tx.status === 'completed' ? 'text-green-500' : tx.status === 'pending' ? 'text-yellow-500' : 'text-red-500'}`}>{tx.status}</div>
+              </div>
+            ))
+          )}
         </div>
-        {filtered.length === 0 ? (
-          <div className={`text-center py-16 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No transactions found</div>
-        ) : (
-          filtered.map((tx, idx) => (
-            <div key={idx} className="grid grid-cols-4 gap-8 items-center py-5 border-b last:border-b-0 border-gray-100 dark:border-[#232946]">
-              <div>{new Date(tx.createdAt).toLocaleDateString()}</div>
-              <div>{tx.type === 'sent' ? `To ${tx.recipient}` : `From ${tx.sender}`}</div>
-              <div className="font-semibold">${tx.amount}</div>
-              <div className={`capitalize font-medium ${tx.status === 'completed' ? 'text-green-500' : tx.status === 'pending' ? 'text-yellow-500' : 'text-red-500'}`}>{tx.status}</div>
-            </div>
-          ))
-        )}
       </div>
     </div>
   );

@@ -65,11 +65,7 @@ export default function Navbar() {
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className={`flex justify-between items-center py-4 px-6 rounded-xl sticky top-4 z-[9999]
-        ${isDarkMode 
-          ? 'bg-[#18192b] border border-white/10 text-white'
-          : 'bg-white/90 border border-gray-200 text-gray-900'}
-        backdrop-blur-sm transition-colors duration-300`}
+      className={`sticky top-0 inset-x-0 w-full flex justify-between items-center py-4 px-6 rounded-b-xl z-50 backdrop-blur-sm transition-colors duration-300 ${isDarkMode ? 'bg-[#18192b]/30 border border-white/10 text-white' : 'bg-white/30 border border-gray-200 text-gray-900'}`}
     >
       <Link href="/" className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-[#7B61FF] to-[#A78BFA]">NexaPay</Link>
       
@@ -94,7 +90,7 @@ export default function Navbar() {
               <div className="flex items-center gap-2 relative group">
                 {/* User Dropdown only for desktop */}
                 <button
-                  className="focus:outline-none flex items-center px-0 py-0 rounded-lg"
+                  className="focus:outline-none flex items-center px-2 py-1 rounded-lg"
                   tabIndex={0}
                   aria-haspopup="true"
                   aria-expanded={dropdownOpen}

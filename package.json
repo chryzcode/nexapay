@@ -34,7 +34,8 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/bn.js": "^5.1.6",
     "@types/jsonwebtoken": "^9.0.9",
-    "@types/node": "^20",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.17.46",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.21",
@@ -45,6 +46,7 @@
     "hardhat": "^2.23.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
   }
 }

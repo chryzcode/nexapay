@@ -18,7 +18,12 @@ interface DashboardAnalyticsProps {
 export default function DashboardAnalytics({ transactions }: DashboardAnalyticsProps) {
   const { isDarkMode } = useTheme();
 
-  const [chartData, setChartData] = useState<any[]>([]);
+  interface ChartDatum {
+  date: string;
+  sent: number;
+  received: number;
+}
+const [chartData, setChartData] = useState<ChartDatum[]>([]);
   const [stats, setStats] = useState({
     total: 0,
     sent: 0,
@@ -39,7 +44,7 @@ export default function DashboardAnalytics({ transactions }: DashboardAnalyticsP
       setDuration('No transactions yet');
       return;
     }
-    const groups: Record<string, { Sent: number; Received: number }> = {};
+    const groups: Record<string, { sent: number; received: number }> = {};
     let sent = 0, received = 0, largestSent = 0, largestReceived = 0;
     let minDate = new Date(transactions[0].createdAt);
     let maxDate = new Date(transactions[0].createdAt);
@@ -48,18 +53,18 @@ export default function DashboardAnalytics({ transactions }: DashboardAnalyticsP
       if (date < minDate) minDate = date;
       if (date > maxDate) maxDate = date;
       const month = date.toLocaleString('default', { month: 'short' });
-      if (!groups[month]) groups[month] = { Sent: 0, Received: 0 };
+      if (!groups[month]) groups[month] = { sent: 0, received: 0 };
       if (tx.type === 'sent') {
-        groups[month].Sent += tx.amount;
+        groups[month].sent += tx.amount;
         sent += tx.amount;
         if (tx.amount > largestSent) largestSent = tx.amount;
       } else if (tx.type === 'received') {
-        groups[month].Received += tx.amount;
+        groups[month].received += tx.amount;
         received += tx.amount;
         if (tx.amount > largestReceived) largestReceived = tx.amount;
       }
     });
-    const chartArr = Object.entries(groups).map(([name, vals]) => ({ name, ...vals }));
+    const chartArr = Object.entries(groups).map(([month, vals]) => ({ date: month, sent: vals.sent, received: vals.received }));
     const months = chartArr.length || 1;
     setChartData(chartArr);
     setStats({
@@ -94,12 +99,12 @@ export default function DashboardAnalytics({ transactions }: DashboardAnalyticsP
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#2D2E4A' : '#e7e7f6'} />
-            <XAxis dataKey="name" stroke={isDarkMode ? '#c7c7f7' : '#232946'} />
+            <XAxis dataKey="date" stroke={isDarkMode ? '#c7c7f7' : '#232946'} />
             <YAxis stroke={isDarkMode ? '#c7c7f7' : '#232946'} />
             <Tooltip contentStyle={{ background: isDarkMode ? '#232946' : '#fff', borderRadius: 12, border: 'none' }} />
             <Legend />
-            <Bar dataKey="Sent" fill="#7B61FF" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="Received" fill="#A78BFA" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="sent" fill="#7B61FF" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="received" fill="#A78BFA" radius={[8, 8, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
         {(!transactions || transactions.length === 0) && (

@@ -13,6 +13,9 @@ interface Transaction {
   sender: string;
   amount: number;
   status: string;
+  currency: string;
+  network: number;
+  txHash: string;
 }
 
 export default function Transactions() {
@@ -90,11 +93,27 @@ export default function Transactions() {
             <div className={`text-center py-16 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No transactions found</div>
           ) : (
             filtered.map((tx, idx) => (
-              <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 items-center py-5 border-b last:border-b-0 border-gray-100 dark:border-[#232946]">
+              <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6 items-center py-5 border-b last:border-b-0 border-gray-100 dark:border-[#232946]">
                 <div>{new Date(tx.createdAt).toLocaleDateString()}</div>
-                <div>{tx.type === 'sent' ? `To ${tx.recipient}` : `From ${tx.sender}`}</div>
-                <div className="font-semibold">${tx.amount}</div>
-                <div className={`capitalize font-medium ${tx.status === 'completed' ? 'text-green-500' : tx.status === 'pending' ? 'text-yellow-500' : 'text-red-500'}`}>{tx.status}</div>
+                <div>{tx.type === 'sent' ? `To ${tx.recipient.slice(0, 6)}...${tx.recipient.slice(-4)}` : `From ${tx.sender.slice(0, 6)}...${tx.sender.slice(-4)}`}</div>
+                <div className="font-semibold">
+                  {tx.type === 'sent' ? '-' : '+'}${tx.amount} {tx.currency}
+                </div>
+                <div className={`capitalize font-medium ${tx.status === 'completed' ? 'text-green-500' : tx.status === 'pending' ? 'text-yellow-500' : 'text-red-500'}`}>
+                  {tx.status}
+                </div>
+                <div className="text-sm text-gray-500">
+                  {tx.txHash && (
+                    <a 
+                      href={`https://sepolia.etherscan.io/tx/${tx.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-blue-500"
+                    >
+                      View on Explorer
+                    </a>
+                  )}
+                </div>
               </div>
             ))
           )}

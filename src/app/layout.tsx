@@ -28,7 +28,7 @@ export default function RootLayout({
           <ThemeProvider>
             <WalletProvider>
               <Navbar />
-              <main className="min-h-screen bg-inherit pt-[72px] pb-8 px-4 md:px-8 relative">
+              <main className="min-h-screen bg-inherit relative my-10">
                 {children}
               </main>
               {/* ToastContainer must be rendered here for all client-side toasts */}

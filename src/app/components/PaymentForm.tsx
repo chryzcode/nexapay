@@ -324,7 +324,7 @@ export default function PaymentForm({
       const from = accounts[0];
 
       // Get current network
-      const chainId = await web3Nexa.eth.getChainId();
+      const chainId = Number(await web3Nexa.eth.getChainId());
       const networkStablecoins = NETWORK_STABLECOINS[chainId];
       
       if (!networkStablecoins) {
@@ -352,8 +352,8 @@ export default function PaymentForm({
         balance: balance.toString()
       });
 
-      if (new BN(balance).lt(new BN(weiAmount))) {
-        throw new Error(`Insufficient ETH balance. Required: ${ethAmount.toFixed(6)} ETH ($${usdAmount}), Available: ${web3Nexa.utils.fromWei(balance, 'ether')} ETH`);
+      if (new BN(balance.toString()).lt(new BN(weiAmount))) {
+        throw new Error(`Insufficient ETH balance. Required: ${ethAmount.toFixed(6)} ETH ($${usdAmount}), Available: ${web3Nexa.utils.fromWei(balance.toString(), 'ether')} ETH`);
       }
 
       // Get gas estimate for ETH transfer
@@ -364,9 +364,9 @@ export default function PaymentForm({
       });
 
       // Add 30% buffer to gas estimate
-      const gasWithBuffer = Math.floor(Number(gasEstimate) * 1.3).toString();
+      const gasWithBuffer = Math.floor(Number(gasEstimate.toString()) * 1.3).toString();
       const gasPrice = await web3Nexa.eth.getGasPrice();
-      const adjustedGasPrice = Math.floor(Number(gasPrice) * 1.1).toString();
+      const adjustedGasPrice = Math.floor(Number(gasPrice.toString()) * 1.1).toString();
 
       console.log('Sending ETH with params:', {
         gas: gasWithBuffer,

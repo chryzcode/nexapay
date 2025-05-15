@@ -21,7 +21,7 @@ contract NexaPayPayment {
         address indexed merchant,
         address indexed token,
         uint256 amount,
-        string reference
+        string paymentReference
     );
     event TokenSupportUpdated(address token, bool supported);
 
@@ -48,9 +48,9 @@ contract NexaPayPayment {
      * @param token ERC20 token address (USDT, USDC, etc.)
      * @param merchant Merchant's address
      * @param amount Payment amount (in token's smallest unit)
-     * @param reference Optional payment reference (orderId, invoice, etc.)
+     * @param paymentReference Optional payment reference (orderId, invoice, etc.)
      */
-    function pay(address token, address merchant, uint256 amount, string calldata reference) external {
+    function pay(address token, address merchant, uint256 amount, string calldata paymentReference) external {
         require(supportedTokens[token], "Token not supported");
         require(amount > 0, "Amount must be positive");
         require(merchant != address(0), "Invalid merchant");
@@ -60,6 +60,6 @@ contract NexaPayPayment {
         bool success = IERC20(token).transferFrom(msg.sender, merchant, amount);
         require(success, "Transfer failed");
 
-        emit PaymentReceived(msg.sender, merchant, token, amount, reference);
+        emit PaymentReceived(msg.sender, merchant, token, amount, paymentReference);
     }
 }

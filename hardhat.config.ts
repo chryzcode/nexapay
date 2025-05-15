@@ -1,14 +1,15 @@
-import * as dotenv from "dotenv";
-import { HardhatUserConfig } from "hardhat/config";
+import * as dotenv from 'dotenv';
+import { HardhatUserConfig } from 'hardhat/config';
 import "@nomiclabs/hardhat-ethers";
 dotenv.config();
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.17",
+  solidity: "0.8.20",
   networks: {
+    // Testnet Networks
     sepolia: {
-      url: process.env.SEPOLIA_RPC_URL || "",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      url: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
+      accounts: process.env.DEPLOYER_PK ? [process.env.DEPLOYER_PK] : [],
     },
   },
   paths: {

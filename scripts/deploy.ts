@@ -4,13 +4,19 @@ import { ethers } from "hardhat";
 dotenv.config(); // Load .env
 
 async function main() {
-  console.log("Deploying PaymentGateway to Sepolia Testnet...");
+  console.log("Deploying NexaPayPayment to Sepolia Testnet...");
 
-  const Gateway = await ethers.getContractFactory("PaymentGateway");
-  const gateway = await Gateway.deploy();
-  await gateway.deployed();
+  // Initial supported tokens (USDC and USDT Sepolia)
+  const initialTokens = [
+    "0x1c7D4B196Cb0C7B01d3E18fbfD9A0fD5963E1f05", // USDC Sepolia
+    "0x7169D38820dfd117C3FA1f22a697dC8d4277c485"  // USDT Sepolia
+  ];
 
-  console.log("PaymentGateway deployed at address:", gateway.address);
+  const Factory = await ethers.getContractFactory("NexaPayPayment");
+  const contract = await Factory.deploy(initialTokens);
+  await contract.deployed();
+
+  console.log("NexaPayPayment deployed at address:", contract.address);
 }
 
 main().catch((error) => {

@@ -25,7 +25,7 @@ export default function Home() {
       </div>
 
       {/* Hero */}
-      <section className="pt-24 md:pt-32 px-8 md:px-16 grid md:grid-cols-2 gap-12 items-center">
+      <section className="pt-16 md:pt-20 px-8 md:px-16 grid md:grid-cols-2 gap-12 items-center">
         <motion.div
           initial={{ x: -50, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
@@ -40,7 +40,7 @@ export default function Home() {
           </p>
           
           <div className="mt-8 flex flex-wrap gap-4">
-            <a href="#demo" className="px-6 py-3 bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white rounded-lg font-medium hover:shadow-lg hover:shadow-purple-500/30 transition-all">Get Started</a>
+            <a href="/register" className="px-6 py-3 bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white rounded-lg font-medium hover:shadow-lg hover:shadow-purple-500/30 transition-all">Get Started</a>
           </div>
           
           <div className="mt-10 flex items-center gap-2">
@@ -225,7 +225,7 @@ export default function Home() {
       </motion.section>
 
       {/* Testimonials */}
-      <motion.section
+      {/* <motion.section
         className="px-8 md:px-16 py-20"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
@@ -291,7 +291,7 @@ export default function Home() {
             <div key={index} className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} font-bold text-xl`}>{company}</div>
           ))}
         </div>
-      </motion.section>
+      </motion.section> */}
       
       {/* FAQ Section */}
       <motion.section
@@ -367,13 +367,16 @@ export default function Home() {
               Start accepting crypto payments today and unlock global commerce potential with NexaPay
             </p>
             <div className="flex flex-col md:flex-row justify-center items-center gap-6">
-              <motion.button
-                className="bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white py-3 px-8 rounded-full font-medium hover:from-[#6B51EF] hover:to-[#9771FA] shadow-lg shadow-purple-900/20"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Start for Free
-              </motion.button>
+
+              <Link href="/register">
+                <motion.button
+                  className="bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white py-3 px-8 rounded-full font-medium hover:from-[#6B51EF] hover:to-[#9771FA] shadow-lg shadow-purple-900/20"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Start for Free
+                </motion.button>
+              </Link>
             </div>
           </div>
         </div>
@@ -382,16 +385,15 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="px-8 md:px-16 py-12 border-t border-[#2D2F36]">
-        <div className="flex flex-col md:flex-row justify-between items-center">
-          <div className="mb-6 md:mb-0">
+        <div className="flex flex-col md:flex-row md:justify-between">
+          <div className="w-full md:w-auto mb-6 md:mb-0 text-center md:text-left">
             <div className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#7B61FF] to-[#A78BFA]">NexaPay</div>
-            <p className="text-gray-400 mt-2">© 2024 NexaPay. All rights reserved.</p>
+            <p className="text-gray-400 mt-2">&copy; {new Date().getFullYear()} NexaPay. All rights reserved.</p>
           </div>
-          <div className="flex space-x-8">
-            <a href="#" className="text-gray-400 hover:text-white">Email</a>
-            <a href="#" className="text-gray-400 hover:text-white">Twitter</a>
-            <a href="#" className="text-gray-400 hover:text-white">Linkedin</a>
-            <a href="#" className="text-gray-400 hover:text-white">Contact</a>
+          <div className="w-full md:w-auto flex justify-center md:justify-start space-x-8">
+            <a href="mailto:alabaolanrewaju13@gmail.com" className="text-gray-400 hover:text-white">Email</a>
+            <a href="https://twitter.com/chryzcode" className="text-gray-400 hover:text-white">Twitter</a>
+            <a href="https://www.linkedin.com/in/olanrewaju-alaba/" className="text-gray-400 hover:text-white">Linkedin</a>
           </div>
         </div>
       </footer>

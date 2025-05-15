@@ -37,8 +37,8 @@ export async function GET() {
       const userTransactions = await transactions
         .find({
           $or: [
-            { senderId: new ObjectId(userId) },
-            { recipientId: new ObjectId(userId) },
+            { senderId: userId },
+            { recipientId: userId },
           ],
         })
         .sort({ createdAt: -1 })
@@ -51,8 +51,11 @@ export async function GET() {
           type: transaction.type,
           status: transaction.status,
           createdAt: transaction.createdAt,
-          sender: transaction.senderId.toString(),
-          recipient: transaction.recipientId.toString(),
+          sender: transaction.senderId,
+          recipient: transaction.recipientId,
+          currency: transaction.currency || 'ETH',
+          network: transaction.network,
+          txHash: transaction.txHash
         })),
       });
     } catch (error) {
@@ -91,7 +94,7 @@ export async function POST(request: Request) {
       }
       const { userId } = decoded as { userId: string };
 
-      const { amount, recipientId, type } = await request.json();
+      const { amount, recipientId, type, status, txHash, currency, network, senderId, createdAt } = await request.json();
 
       if (!amount || !recipientId || !type) {
         return NextResponse.json(
@@ -102,28 +105,18 @@ export async function POST(request: Request) {
 
       const client = await db;
       const transactions = client.db().collection("transactions");
-      const users = client.db().collection("users");
-
-      // Check if recipient exists
-      const recipient = await users.findOne({
-        _id: new ObjectId(recipientId),
-      });
-
-      if (!recipient) {
-        return NextResponse.json(
-          { error: "Recipient not found" },
-          { status: 404 }
-        );
-      }
 
       // Create transaction
       const result = await transactions.insertOne({
         amount,
         type,
-        status: "pending",
-        senderId: new ObjectId(userId),
-        recipientId: new ObjectId(recipientId),
-        createdAt: new Date(),
+        status: status || "pending",
+        senderId: senderId || userId,
+        recipientId,
+        txHash,
+        currency: currency || 'ETH',
+        network,
+        createdAt: createdAt || new Date(),
         updatedAt: new Date(),
       });
 

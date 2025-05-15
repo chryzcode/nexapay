@@ -6,22 +6,77 @@ declare global {
   }
 }
 
-import { useState, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from "react-toastify";
+import { ethers } from "ethers";
+import { useTheme } from "../providers/ThemeProvider";
+import { resolveRecipient, RecipientResolutionResult, getNetworkName } from "../utils/userResolution";
+import { stargateSwap, LZ_CHAIN_IDS, STARGATE_ROUTER_ADDRESSES } from "./stargate";
 import Web3 from "web3";
 import BN from "bn.js";
-import { useTheme } from "../providers/ThemeProvider";
 
-// NexaPayPayment contract ABI (partial, just pay and supportedTokens)
+// Token information type definition
+type TokenInfo = {
+  symbol: string;
+  address: string;
+  decimals: number;
+};
+
+// NexaPayPayment contract ABI (including pay, supportedTokens, and PaymentReceived event)
 const NEXAPAY_ABI = [
+  {
+    "inputs": [
+      { "internalType": "address[]", "name": "initialTokens", "type": "address[]" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "payer", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "merchant", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "token", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
+      { "indexed": false, "internalType": "string", "name": "paymentReference", "type": "string" }
+    ],
+    "name": "PaymentReceived",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": false, "internalType": "address", "name": "token", "type": "address" },
+      { "indexed": false, "internalType": "bool", "name": "supported", "type": "bool" }
+    ],
+    "name": "TokenSupportUpdated",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
   {
     "inputs": [
       { "internalType": "address", "name": "token", "type": "address" },
       { "internalType": "address", "name": "merchant", "type": "address" },
       { "internalType": "uint256", "name": "amount", "type": "uint256" },
-      { "internalType": "string", "name": "reference", "type": "string" }
+      { "internalType": "string", "name": "paymentReference", "type": "string" }
     ],
     "name": "pay",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "token", "type": "address" },
+      { "internalType": "bool", "name": "supported", "type": "bool" }
+    ],
+    "name": "setTokenSupport",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -31,160 +86,360 @@ const NEXAPAY_ABI = [
       { "internalType": "address", "name": "", "type": "address" }
     ],
     "name": "supportedTokens",
-    "outputs": [
-      { "internalType": "bool", "name": "", "type": "bool" }
-    ],
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
     "stateMutability": "view",
     "type": "function"
   }
 ];
 
-// Supported tokens (replace with actual deployed addresses)
-const SUPPORTED_TOKENS = [
-  {
-    symbol: "USDT",
-    address: "0x...", // Replace with actual USDT address
-    decimals: 6, // USDT/USDC typically use 6 decimals
+// Network-specific stablecoin configurations
+const NETWORK_STABLECOINS: Record<number, { usdc: TokenInfo; usdt: TokenInfo }> = {
+  // Mainnet Networks
+  1: {  // Ethereum Mainnet
+    usdc: { symbol: "USDC", address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", decimals: 6 },
+    usdt: { symbol: "USDT", address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", decimals: 6 }
   },
-  {
-    symbol: "USDC",
-    address: "0x...", // Replace with actual USDC address
-    decimals: 6,
+  137: {  // Polygon Mainnet
+    usdc: { symbol: "USDC", address: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", decimals: 6 },
+    usdt: { symbol: "USDT", address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", decimals: 6 }
   },
-];
+  56: {  // BSC Mainnet
+    usdc: { symbol: "USDC", address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", decimals: 18 },
+    usdt: { symbol: "USDT", address: "0x55d398326f99059fF775485246999027B3197955", decimals: 18 }
+  },
+  43114: {  // Avalanche
+    usdc: { symbol: "USDC", address: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E", decimals: 6 },
+    usdt: { symbol: "USDT", address: "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7", decimals: 6 }
+  },
+  // Testnet Networks (keeping existing testnets)
+  11155111: {  // Sepolia (Ethereum Testnet)
+    usdc: { symbol: "USDC", address: "0x1c7D4B196Cb0C7B01d3E18fbfD9A0fD5963E1f05", decimals: 6 },
+    usdt: { symbol: "USDT", address: "0x7169D38820dfd117C3FA1f22a697dC8d4277c485", decimals: 6 }
+  },
+  80001: {  // Mumbai (Polygon Testnet)
+    usdc: { symbol: "USDC", address: "0x0FA8EmA34E77646Ae76f9b9d6eCb8A4a6F9B2A7", decimals: 6 },
+    usdt: { symbol: "USDT", address: "0x3813e82e6f7098b9583FC0F33a962D02018B6803", decimals: 6 }
+  },
+  97: {   // BSC Testnet
+    usdc: { symbol: "USDC", address: "0x64544969ed7EBf5f083679233325356EAe6b383", decimals: 18 },
+    usdt: { symbol: "USDT", address: "0x337610d27c682E347C9d7A50d0A9B5eB16b8E7AC", decimals: 18 }
+  }
+};
 
 // NexaPayPayment contract address (replace with actual deployed address)
-const NEXAPAY_CONTRACT_ADDRESS = "0x...";
+const NEXAPAY_CONTRACT_ADDR = process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT;
 
-const IDENTIFIER_TYPES = [
-  { label: "Wallet Address", value: "address", placeholder: "0x..." },
-  { label: "Username", value: "username", placeholder: "username" },
-  { label: "User ID", value: "userId", placeholder: "123456" },
-];
+enum IdentifierType {
+  WALLET = 'wallet',
+  USERNAME = 'username',
+  USER_ID = 'userId',
+  EMAIL = 'email'
+}
 
-export default function PaymentForm({ onClose }: { onClose?: () => void }) {
+const IDENTIFIER_TYPES_LIST = [
+  { label: "Wallet Address", value: IdentifierType.WALLET, placeholder: "0x..." },
+  { label: "Username", value: IdentifierType.USERNAME, placeholder: "username" },
+  { label: "User ID", value: IdentifierType.USER_ID, placeholder: "123456" },
+  { label: "Email", value: IdentifierType.EMAIL, placeholder: "email@example.com" },
+] as const;
+
+enum RecipientStatus {
+  IDLE = 'idle',
+  SEARCHING = 'searching',
+  FOUND = 'found',
+  NOT_FOUND = 'not_found',
+  ERROR = 'error'
+}
+
+interface RecipientResolution {
+  address?: string;
+  type?: IdentifierType;
+  metadata?: Record<string, unknown>;
+}
+
+interface PaymentFormProps {
+  onClose?: () => void;
+  srcChainId?: number;
+  dstChainId?: number;
+}
+
+export default function PaymentForm({ 
+  onClose, 
+  srcChainId = 11155111, // Default to Sepolia
+  dstChainId = 11155111 
+}: PaymentFormProps) {
   const { isDarkMode } = useTheme();
-  const [identifierType, setIdentifierType] = useState("address");
-  const [merchant, setMerchant] = useState("");
-  const [amount, setAmount] = useState("");
-  const [reference, setReference] = useState("");
-  const [token, setToken] = useState(SUPPORTED_TOKENS[0].address);
-  const [sending, setSending] = useState(false);
+  const [identifierType, setIdentifierType] = useState<IdentifierType>(IdentifierType.WALLET);
+  const [merchant, setMerchant] = useState<string>("");
+  const [amount, setAmount] = useState<string>("");
+  const [reference, setReference] = useState<string>("");
+  const [sending, setSending] = useState<boolean>(false);
 
   // Enhancement state
   const [usdRate, setUsdRate] = useState<number | null>(null);
   const [usdValue, setUsdValue] = useState<string>("");
-  const [recipientAddress, setRecipientAddress] = useState<string>("");
-  const [recipientStatus, setRecipientStatus] = useState<'idle' | 'loading' | 'found' | 'notfound'>('idle');
+  const [recipientInput, setRecipientInput] = useState("");
+  const [recipientResolution, setRecipientResolution] = useState<RecipientResolution | null>(null);
+  const [recipientStatus, setRecipientStatus] = useState<RecipientStatus>(RecipientStatus.IDLE);
+
+  // Add these state variables near the top of the component
+  const [ethAmount, setEthAmount] = useState<number | null>(null);
+  const [ethPrice, setEthPrice] = useState<number | null>(null);
 
   // Fetch token USD rate on token change
   useEffect(() => {
     async function fetchRate() {
       setUsdRate(null);
-      let coingeckoId = '';
-      if (token.toLowerCase().includes('usdt')) coingeckoId = 'tether';
-      else if (token.toLowerCase().includes('usdc')) coingeckoId = 'usd-coin';
-      else coingeckoId = 'usd-coin'; // fallback
+      setEthPrice(null);
       try {
-        const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoId}&vs_currencies=usd`);
-        const data = await res.json();
-        setUsdRate(data[coingeckoId]?.usd || null);
-      } catch {
+        // Get current ETH price in USD
+        const ethPriceResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+        const ethPriceData = await ethPriceResponse.json();
+        const currentEthPrice = ethPriceData.ethereum.usd;
+        setEthPrice(currentEthPrice);
+
+        // Detect current network's token
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const network = await provider.getNetwork();
+        
+        // Fallback to a default network if unsupported
+        const networkStablecoins = NETWORK_STABLECOINS[network.chainId] || NETWORK_STABLECOINS[11155111]; // Default to Sepolia
+        
+        // Prefer USDC, fallback to USDT
+        let tokenInfo: TokenInfo = networkStablecoins.usdc || networkStablecoins.usdt;
+        if (!tokenInfo) {
+          toast.warning("Using default stablecoin due to network detection issue");
+          // Hardcoded fallback to Sepolia USDC
+          tokenInfo = NETWORK_STABLECOINS[11155111].usdc;
+        }
+        
+        let coingeckoId = '';
+        if (tokenInfo.symbol.toLowerCase().includes('usdt')) coingeckoId = 'tether';
+        else if (tokenInfo.symbol.toLowerCase().includes('usdc')) coingeckoId = 'usd-coin';
+        else coingeckoId = 'usd-coin'; // fallback
+        try {
+          const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoId}&vs_currencies=usd`);
+          const data = await res.json();
+          const rate = data[coingeckoId].usd;
+          setUsdRate(rate);
+        } catch (err) {
+          toast.error("Failed to fetch USD rate");
+          setUsdRate(null);
+        }
+      } catch (err) {
+        toast.error("Network detection failed");
         setUsdRate(null);
       }
     }
     fetchRate();
-  }, [token]);
+  }, []); // Ensure dependency is an array
 
   // Calculate USD value on amount or rate change
   useEffect(() => {
-    if (!usdRate || !amount) { setUsdValue(""); return; }
+    if (!usdRate || !amount) { 
+      setUsdValue(""); 
+      setEthAmount(null);
+      return; 
+    }
     const val = parseFloat(amount) * usdRate;
     setUsdValue(val ? `$${val.toFixed(2)}` : "");
-  }, [usdRate, amount]);
+    
+    // Calculate ETH amount
+    if (ethPrice) {
+      const ethVal = parseFloat(amount) / ethPrice;
+      setEthAmount(ethVal);
+    }
+  }, [usdRate, amount, ethPrice]);
 
   // Resolve recipient address on merchant/identifierType change
+  // Debounce logic with useRef
+  // Use number for browser setTimeout
+  const timeoutRef = React.useRef<number | null>(null);
   useEffect(() => {
-    if (!merchant) { setRecipientAddress(""); setRecipientStatus('idle'); return; }
-    if (identifierType === 'address') {
-      setRecipientAddress(merchant);
-      setRecipientStatus('found');
+    if (!recipientInput) {
+      setRecipientResolution(null);
+      setRecipientStatus(RecipientStatus.NOT_FOUND);
       return;
     }
-    setRecipientStatus('loading');
-    fetch('/api/resolve-identifier', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: identifierType, value: merchant })
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.address) {
-          setRecipientAddress(data.address);
-          setRecipientStatus('found');
-        } else {
-          setRecipientAddress("");
-          setRecipientStatus('notfound');
-        }
-      })
-      .catch(() => {
-        setRecipientAddress("");
-        setRecipientStatus('notfound');
-      });
-  }, [merchant, identifierType]);
+    setRecipientStatus(RecipientStatus.SEARCHING);
+    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+    timeoutRef.current = window.setTimeout(async () => {
+      try {
+        // Pass provider and identifierType to resolveRecipient
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const resolvedRecipient = await resolveRecipient(recipientInput, provider);
+        setRecipientResolution({
+          address: resolvedRecipient.address,
+          type: resolvedRecipient.type as IdentifierType,
+        });
+        setRecipientStatus(RecipientStatus.FOUND);
+      } catch (err) {
+        console.error('Recipient resolution error:', err);
+        setRecipientResolution(null);
+        setRecipientStatus(RecipientStatus.NOT_FOUND);
+      }
+    }, 500);
+    return () => {
+      if (timeoutRef.current !== null) {
+        window.clearTimeout(timeoutRef.current);
+      }
+    };
+    // Only rerun when recipientInput or identifierType changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [recipientInput, identifierType]);
 
   // Send payment
-  const handleSend = async (e: React.FormEvent) => {
+  const handleSend = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Reset sending state
+    setSending(false);
+    
+    // Validate MetaMask connection
     if (!window.ethereum) {
       toast.error("MetaMask not detected");
       return;
     }
-    if (!recipientAddress || recipientStatus !== 'found') {
+    
+    // Validate recipient resolution
+    if (!recipientResolution?.address || recipientStatus !== RecipientStatus.FOUND) {
       toast.error("Recipient not found or invalid");
       return;
     }
-    if (!amount) {
-      toast.error("Please enter an amount");
-      return;
-    }
+
     setSending(true);
     try {
-      // 1. Resolve recipient address
-      let recipient = recipientAddress;
-      const web3 = new Web3(window.ethereum);
-      const accounts = await web3.eth.getAccounts();
+      // Validate recipient
+      if (!recipientResolution.address || typeof recipientResolution.address !== 'string') {
+        throw new Error('Recipient address is missing or invalid format');
+      }
+      const web3Nexa = new Web3(window.ethereum);
+      if (!web3Nexa.utils.isAddress(recipientResolution.address)) {
+        throw new Error(`Invalid recipient address format: ${recipientResolution.address}`);
+      }
+      const checksummedRecipient = web3Nexa.utils.toChecksumAddress(recipientResolution.address);
+
+      // Setup accounts and contracts
+      const accounts = await web3Nexa.eth.getAccounts();
       const from = accounts[0];
-      const tokenInfo = SUPPORTED_TOKENS.find(t => t.address === token);
-      if (!tokenInfo) throw new Error("Token not supported");
-      const erc20 = new web3.eth.Contract([
-        {
-          constant: false,
-          inputs: [
-            { name: "_spender", type: "address" },
-            { name: "_value", type: "uint256" }
-          ],
-          name: "approve",
-          outputs: [{ name: "", type: "bool" }],
-          type: "function"
+
+      // Get current network
+      const chainId = Number(await web3Nexa.eth.getChainId());
+      const networkStablecoins = NETWORK_STABLECOINS[chainId];
+      
+      if (!networkStablecoins) {
+        throw new Error(`Network ${chainId} not supported`);
+      }
+
+      // Get current ETH price in USD
+      const ethPriceResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+      const ethPriceData = await ethPriceResponse.json();
+      const ethPrice = ethPriceData.ethereum.usd;
+
+      // Convert USD amount to ETH
+      const usdAmount = parseFloat(amount);
+      const ethAmount = usdAmount / ethPrice;
+      
+      // Convert to Wei
+      const weiAmount = web3Nexa.utils.toWei(ethAmount.toString(), 'ether');
+      const balance = await web3Nexa.eth.getBalance(from);
+      
+      console.log('Payment details:', {
+        usdAmount,
+        ethAmount,
+        weiAmount,
+        ethPrice,
+        balance: balance.toString()
+      });
+
+      if (new BN(balance.toString()).lt(new BN(weiAmount))) {
+        throw new Error(`Insufficient ETH balance. Required: ${ethAmount.toFixed(6)} ETH ($${usdAmount}), Available: ${web3Nexa.utils.fromWei(balance.toString(), 'ether')} ETH`);
+      }
+
+      // Get gas estimate for ETH transfer
+      const gasEstimate = await web3Nexa.eth.estimateGas({
+        from,
+        to: checksummedRecipient,
+        value: weiAmount
+      });
+
+      // Add 30% buffer to gas estimate
+      const gasWithBuffer = Math.floor(Number(gasEstimate.toString()) * 1.3).toString();
+      const gasPrice = await web3Nexa.eth.getGasPrice();
+      const adjustedGasPrice = Math.floor(Number(gasPrice.toString()) * 1.1).toString();
+
+      console.log('Sending ETH with params:', {
+        gas: gasWithBuffer,
+        gasPrice: adjustedGasPrice,
+        from,
+        to: checksummedRecipient,
+        value: weiAmount
+      });
+
+      try {
+        // Send ETH
+        const tx = await web3Nexa.eth.sendTransaction({
+          from,
+          to: checksummedRecipient,
+          value: weiAmount,
+          gas: gasWithBuffer,
+          gasPrice: adjustedGasPrice
+        });
+
+        console.log('ETH transfer successful:', tx.transactionHash);
+
+        // Store transaction in database
+        try {
+          const response = await fetch('/api/transactions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              amount: usdAmount,
+              recipientId: checksummedRecipient,
+              type: 'sent',
+              status: 'completed',
+              txHash: tx.transactionHash,
+              currency: 'ETH',
+              network: chainId,
+              senderId: from,
+              createdAt: new Date().toISOString()
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Failed to store transaction:', errorText);
+            toast.error('Transaction completed but failed to save record');
+          } else {
+            toast.success(`Payment of $${usdAmount} sent successfully`);
+            setMerchant('');
+            setAmount('');
+            setReference('');
+            
+            // Close the modal if onClose is provided
+            if (typeof onClose === 'function') {
+              onClose();
+            }
+          }
+        } catch (dbError) {
+          console.error('Error storing transaction:', dbError);
+          toast.error('Transaction completed but failed to save record');
         }
-      ], token);
-      // Approve the contract to spend tokens
-      const value = new BN(Number(amount) * 10 ** tokenInfo.decimals);
-      await erc20.methods.approve(NEXAPAY_CONTRACT_ADDRESS, value.toString()).send({ from });
-      // Call pay
-      const contract = new web3.eth.Contract(NEXAPAY_ABI as any, NEXAPAY_CONTRACT_ADDRESS);
-      await contract.methods.pay(token, recipient, value.toString(), reference).send({ from });
-      toast.success("Payment sent successfully");
-      setMerchant("");
-      setAmount("");
-      setReference("");
-    } catch (err: any) {
-      toast.error("Payment failed: " + (err?.message || err));
+
+        return;
+      } catch (err: any) {
+        console.error('ETH transfer failed:', err);
+        throw new Error(`Payment failed: ${err.message}`);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Payment failed: ${message}`);
     } finally {
       setSending(false);
     }
-  };
+  }, [recipientResolution, amount, reference, onClose]);
 
   return (
     <div className="fixed inset-0 flex items-start justify-center z-[9999] pointer-events-auto" style={{ paddingTop: '120px' }}>
@@ -209,25 +464,13 @@ export default function PaymentForm({ onClose }: { onClose?: () => void }) {
         <h3 className="text-3xl font-extrabold mb-6 text-[#7B61FF] tracking-tight text-center">Send Payment</h3>
         <form onSubmit={handleSend} className="space-y-5">
           <div>
-            <label className="block text-sm font-semibold mb-1">Token</label>
-            <select
-              value={token}
-              onChange={e => setToken(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg bg-transparent"
-            >
-              {SUPPORTED_TOKENS.map((t) => (
-                <option value={t.address} key={t.symbol}>{t.symbol}</option>
-              ))}
-            </select>
-          </div>
-          <div>
             <label className="block text-sm font-semibold mb-1">Recipient Type</label>
             <select
               value={identifierType}
-              onChange={e => setIdentifierType(e.target.value)}
+              onChange={e => setIdentifierType(e.target.value as IdentifierType)}
               className="w-full px-3 py-2 border rounded-lg bg-transparent"
             >
-              {IDENTIFIER_TYPES.map(type => (
+              {IDENTIFIER_TYPES_LIST.map(type => (
                 <option value={type.value} key={type.value}>{type.label}</option>
               ))}
             </select>
@@ -236,38 +479,60 @@ export default function PaymentForm({ onClose }: { onClose?: () => void }) {
             <label className="block text-sm font-semibold mb-1">Recipient</label>
             <input
               type="text"
-              value={merchant}
-              onChange={e => setMerchant(e.target.value)}
+              value={recipientInput}
+              onChange={(e) => {
+                const input = e.target.value;
+                setRecipientInput(input);
+                setRecipientStatus(RecipientStatus.SEARCHING);
+                setRecipientResolution(null);
+              }}
+              placeholder="Enter wallet address, username, or ENS"
               className="w-full px-3 py-2 border rounded-lg bg-transparent"
-              placeholder={IDENTIFIER_TYPES.find(t => t.value === identifierType)?.placeholder || ""}
-              required
             />
-            {/* Recipient resolution feedback */}
-            {recipientStatus === 'loading' && (
-              <div className="text-xs text-yellow-400 mt-1">Resolving recipient...</div>
+            {recipientStatus === RecipientStatus.SEARCHING && (
+              <div className="text-sm text-gray-500 mt-1">Resolving recipient...</div>
             )}
-            {recipientStatus === 'found' && recipientAddress && (
-              <div className="text-xs text-green-400 mt-1">Recipient: {recipientAddress.slice(0, 6)}...{recipientAddress.slice(-4)}</div>
+            {recipientStatus === RecipientStatus.NOT_FOUND && (
+              <div className="text-sm text-red-500 mt-1">Recipient not found</div>
             )}
-            {recipientStatus === 'notfound' && (
-              <div className="text-xs text-red-400 mt-1">Recipient not found</div>
-            )}
+            {recipientStatus === RecipientStatus.FOUND &&
+              recipientResolution?.type != null &&
+              recipientResolution?.address != null && (
+                <div className="text-sm text-green-500 mt-1">
+                  Resolved {String(recipientResolution.type ?? '')}: {String(recipientResolution.address ?? '')}
+                  {recipientResolution.metadata && typeof recipientResolution.metadata.networkHint === 'number'
+                    ? ` (${getNetworkName(recipientResolution.metadata.networkHint)})`
+                    : ''}
+                </div>
+              )}
           </div>
           <div>
-            <label className="block text-sm font-semibold mb-1">Amount</label>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg bg-transparent"
-              placeholder="0.00"
-              required
-            />
-            {/* USD Conversion display */}
+            <label className="block text-sm font-semibold mb-1">Amount (USD)</label>
+            <div className="relative">
+              <input
+                type="number"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg bg-transparent"
+                placeholder="0.00"
+                required
+                min="0"
+                step="0.01"
+              />
+              <div className="absolute right-3 top-2 text-gray-500">USD</div>
+            </div>
             {usdValue && (
-              <div className="text-xs text-blue-400 mt-1">≈ {usdValue} USD</div>
+              <div className="mt-2 space-y-1">
+                <div className="text-sm text-gray-500">
+                  <span className="font-medium">Amount in ETH:</span> {ethAmount ? `${ethAmount.toFixed(6)} ETH` : 'Calculating...'}
+                </div>
+                <div className="text-sm text-gray-500">
+                  <span className="font-medium">Current ETH Price:</span> ${ethPrice ? ethPrice.toFixed(2) : 'Loading...'}
+                </div>
+                <div className="text-xs text-blue-400">
+                  ≈ {usdValue} USD
+                </div>
+              </div>
             )}
           </div>
           <div>
@@ -276,8 +541,8 @@ export default function PaymentForm({ onClose }: { onClose?: () => void }) {
               type="text"
               value={reference}
               onChange={e => setReference(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg bg-transparent"
               placeholder="Order ID, Invoice, etc."
+              className="w-full px-3 py-2 border rounded-lg bg-transparent"
             />
           </div>
           <button

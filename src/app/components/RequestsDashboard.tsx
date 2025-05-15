@@ -38,14 +38,16 @@ export default function RequestsDashboard({ currentUserId }: Props) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to fetch requests");
         setRequests(data.requests || []);
-      } catch (err: any) {
-        setError(err.message || "Failed to fetch requests");
+      } catch (err: unknown) {
+        let msg = "Failed to fetch requests";
+        if (err instanceof Error) msg = err.message;
+        setError(msg);
       } finally {
         setLoading(false);
       }
     }
     fetchRequests();
-  }, []);
+  }, [currentUserId]);
 
   // Add actions for approve/pay/reject and show usernames/userCodes
   const handleReject = async (requestId: string) => {

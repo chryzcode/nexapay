@@ -14,6 +14,7 @@ import { resolveRecipient, RecipientResolutionResult, getNetworkName } from "../
 import { stargateSwap, LZ_CHAIN_IDS, STARGATE_ROUTER_ADDRESSES } from "./stargate";
 import Web3 from "web3";
 import BN from "bn.js";
+import { useWallet } from "@/context/WalletContext";
 
 // Token information type definition
 type TokenInfo = {
@@ -163,12 +164,25 @@ interface PaymentFormProps {
   dstChainId?: number;
 }
 
+// Move this to the top, before getChainName and all usages
+const CHAIN_OPTIONS = [
+  { id: 1, name: 'Ethereum Mainnet' },
+  { id: 137, name: 'Polygon' },
+  { id: 56, name: 'BSC' },
+  { id: 43114, name: 'Avalanche' },
+  { id: 11155111, name: 'Sepolia (Testnet)' },
+  { id: 80001, name: 'Mumbai (Testnet)' },
+  { id: 97, name: 'BSC Testnet' },
+];
+
 export default function PaymentForm({ 
   onClose, 
   srcChainId = 11155111, // Default to Sepolia
   dstChainId = 11155111 
 }: PaymentFormProps) {
   const { isDarkMode } = useTheme();
+  const { account } = useWallet();
+  const [currentUserId, setCurrentUserId] = useState<string>("");
   const [identifierType, setIdentifierType] = useState<IdentifierType>(IdentifierType.WALLET);
   const [merchant, setMerchant] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
@@ -185,6 +199,27 @@ export default function PaymentForm({
   // Add these state variables near the top of the component
   const [ethAmount, setEthAmount] = useState<number | null>(null);
   const [ethPrice, setEthPrice] = useState<number | null>(null);
+
+  // Helper to get chain name
+  function getChainName(chainId: number) {
+    const found = CHAIN_OPTIONS.find(opt => opt.id === chainId);
+    return found ? found.name : `Chain ${chainId}`;
+  }
+
+  // Helper to get sender wallet address (if available)
+  const [senderAddress, setSenderAddress] = useState<string>("");
+  useEffect(() => {
+    async function fetchAddress() {
+      if (window.ethereum) {
+        try {
+          const web3 = new Web3(window.ethereum);
+          const accounts = await web3.eth.getAccounts();
+          setSenderAddress(accounts[0] || "");
+        } catch {}
+      }
+    }
+    fetchAddress();
+  }, []);
 
   // Fetch token USD rate on token change
   useEffect(() => {
@@ -288,6 +323,27 @@ export default function PaymentForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [recipientInput, identifierType]);
 
+  // Add useEffect to fetch current user ID
+  useEffect(() => {
+    async function fetchUserId() {
+      try {
+        const res = await fetch("/api/auth/me");
+        const data = await res.json();
+        if (!data.user?.id) {
+          throw new Error('User ID not found');
+        }
+        setCurrentUserId(data.user.id);
+      } catch (err) {
+        console.error('Failed to fetch user ID:', err);
+        toast.error('Authentication error - please log in again');
+        if (typeof onClose === 'function') {
+          onClose();
+        }
+      }
+    }
+    fetchUserId();
+  }, [onClose]);
+
   // Send payment
   const handleSend = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -388,6 +444,27 @@ export default function PaymentForm({
 
         console.log('ETH transfer successful:', tx.transactionHash);
 
+        // Get recipient's user ID from their wallet address
+        const recipientRes = await fetch('/api/resolve-identifier', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            type: 'address',
+            value: checksummedRecipient
+          })
+        });
+
+        if (!recipientRes.ok) {
+          throw new Error('Failed to resolve recipient user ID');
+        }
+
+        const { userId: recipientUserId } = await recipientRes.json();
+        if (!recipientUserId) {
+          throw new Error('Recipient user ID not found');
+        }
+
         // Store transaction in database
         try {
           const response = await fetch('/api/transactions', {
@@ -397,13 +474,13 @@ export default function PaymentForm({
             },
             body: JSON.stringify({
               amount: usdAmount,
-              recipientId: checksummedRecipient,
+              recipientId: recipientUserId,
               type: 'sent',
               status: 'completed',
               txHash: tx.transactionHash,
               currency: 'ETH',
               network: chainId,
-              senderId: from,
+              senderId: currentUserId,
               createdAt: new Date().toISOString()
             }),
           });
@@ -439,28 +516,14 @@ export default function PaymentForm({
     } finally {
       setSending(false);
     }
-  }, [recipientResolution, amount, reference, onClose]);
+  }, [recipientResolution, amount, reference, onClose, currentUserId]);
 
   return (
-    <div className="fixed inset-0 flex items-start justify-center z-[9999] pointer-events-auto" style={{ paddingTop: '120px' }}>
+    <div className="fixed inset-0 flex items-start justify-center z-[9999] pointer-events-auto" style={{ paddingTop: '50px' }}>
       {/* Optional translucent overlay for modal effect */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" style={{ zIndex: 0 }}></div>
       <div className={`relative bg-white/5 border border-white/10 rounded-xl p-8 w-full max-w-lg shadow-2xl ${isDarkMode ? 'bg-[#18192b] text-white' : 'bg-white text-[#18192b]'}`}
         style={{ zIndex: 1 }}>
-        {/* Close button - should call a prop function if provided */}
-        {typeof onClose === 'function' && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-5 right-5 text-2xl text-white/70 hover:text-white focus:outline-none"
-            aria-label="Close"
-            style={{ zIndex: 2 }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
         <h3 className="text-3xl font-extrabold mb-6 text-[#7B61FF] tracking-tight text-center">Send Payment</h3>
         <form onSubmit={handleSend} className="space-y-5">
           <div>
@@ -544,6 +607,10 @@ export default function PaymentForm({
               placeholder="Order ID, Invoice, etc."
               className="w-full px-3 py-2 border rounded-lg bg-transparent"
             />
+          </div>
+          {/* Show sender chain always, recipient chain only if resolved */}
+          <div className="text-center text-base font-semibold mb-2">
+            {getChainName(srcChainId)} <span className="mx-2">→</span> {recipientInput && recipientResolution?.address ? getChainName(dstChainId) : ''}
           </div>
           <button
             type="submit"

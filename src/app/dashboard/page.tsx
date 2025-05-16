@@ -182,9 +182,37 @@ export default function Dashboard() {
           >
             <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-gradient-to-br from-[#A78BFA]/30 to-[#7B61FF]/10 rounded-full blur-2xl opacity-60"></div>
             <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2"><FaMoneyBillWave className="text-[#A78BFA]" /> Recent Transactions</h2>
-            <div className="flex-1 flex flex-col items-center justify-center">
-              <svg width="48" height="48" fill="none" className="mb-2 opacity-40"><rect width="48" height="48" rx="24" fill="#A78BFA" fillOpacity="0.13"/><path d="M16 24h16M24 16v16" stroke="#7B61FF" strokeWidth="2.5" strokeLinecap="round"/></svg>
-              <div className="text-gray-400 text-center">No recent transactions</div>
+            <div className="flex-1 flex flex-col">
+              {transactions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center flex-1">
+                  <svg width="48" height="48" fill="none" className="mb-2 opacity-40">
+                    <rect width="48" height="48" rx="24" fill="#A78BFA" fillOpacity="0.13"/>
+                    <path d="M16 24h16M24 16v16" stroke="#7B61FF" strokeWidth="2.5" strokeLinecap="round"/>
+                  </svg>
+                  <div className="text-gray-400 text-center">No recent transactions</div>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                  {transactions.slice(0, 5).map((tx: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-white/5 dark:bg-[#232946]/20 border border-white/10">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${tx.type === 'sent' ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-500'}`}>
+                          {tx.type === 'sent' ? <FaArrowUp /> : <FaArrowDown />}
+                        </div>
+                        <div>
+                          <div className="font-medium">
+                            {tx.type === 'sent' ? 'Sent to' : 'Received from'} {tx.type === 'sent' ? tx.recipient.slice(0, 6) + '...' + tx.recipient.slice(-4) : tx.sender.slice(0, 6) + '...' + tx.sender.slice(-4)}
+                          </div>
+                          <div className="text-sm text-gray-400">{new Date(tx.createdAt).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                      <div className={`font-semibold ${tx.type === 'sent' ? 'text-red-500' : 'text-green-500'}`}>
+                        {tx.type === 'sent' ? '-' : '+'}${tx.amount} {tx.currency}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
         </AnimatePresence>

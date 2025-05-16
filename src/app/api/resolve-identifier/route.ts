@@ -4,18 +4,29 @@ import dbPromise from '@/lib/db';
 export async function POST(request: NextRequest) {
   const { type, value } = await request.json();
   let address: string | null = null;
+  let userId: string | null = null;
 
   const client = await dbPromise;
   const db = client.db(); // optionally: client.db('your_db_name')
 
   if (type === 'address') {
-    address = value;
+    const user = await db.collection('users').findOne({ walletAddress: value });
+    if (user) {
+      address = user.walletAddress;
+      userId = user._id.toString();
+    }
   } else if (type === 'username') {
     const user = await db.collection('users').findOne({ username: value });
-    address = user?.walletAddress || null;
+    if (user) {
+      address = user.walletAddress;
+      userId = user._id.toString();
+    }
   } else if (type === 'userId') {
-    const user = await db.collection('users').findOne({ userId: value });
-    address = user?.walletAddress || null;
+    const user = await db.collection('users').findOne({ _id: value });
+    if (user) {
+      address = user.walletAddress;
+      userId = user._id.toString();
+    }
   } else {
     return NextResponse.json({ error: 'Invalid identifier type' }, { status: 400 });
   }
@@ -24,5 +35,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ address });
+  return NextResponse.json({ address, userId });
 }

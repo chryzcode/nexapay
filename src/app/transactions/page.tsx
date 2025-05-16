@@ -93,27 +93,32 @@ export default function Transactions() {
             <div className={`text-center py-16 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No transactions found</div>
           ) : (
             filtered.map((tx, idx) => (
-              <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6 items-center py-5 border-b last:border-b-0 border-gray-100 dark:border-[#232946]">
-                <div>{new Date(tx.createdAt).toLocaleDateString()}</div>
-                <div>{tx.type === 'sent' ? `To ${tx.recipient.slice(0, 6)}...${tx.recipient.slice(-4)}` : `From ${tx.sender.slice(0, 6)}...${tx.sender.slice(-4)}`}</div>
-                <div className="font-semibold">
-                  {tx.type === 'sent' ? '-' : '+'}${tx.amount} {tx.currency}
+              <div key={idx} className="space-y-2 py-4 border-b last:border-b-0 border-gray-100 dark:border-[#232946]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 items-center">
+                  <div>{new Date(tx.createdAt).toLocaleDateString()}</div>
+                  <div>{tx.type === 'sent' ? `To ${tx.recipient.slice(0, 6)}...${tx.recipient.slice(-4)}` : `From ${tx.sender.slice(0, 6)}...${tx.sender.slice(-4)}`}</div>
+                  <div className="font-semibold">
+                    {tx.type === 'sent' ? '-' : '+'}${tx.amount} {tx.currency}
+                  </div>
+                  <div className={`capitalize font-medium ${tx.status === 'completed' ? 'text-green-500' : tx.status === 'pending' ? 'text-yellow-500' : 'text-red-500'}`}>
+                    {tx.status}
+                  </div>
                 </div>
-                <div className={`capitalize font-medium ${tx.status === 'completed' ? 'text-green-500' : tx.status === 'pending' ? 'text-yellow-500' : 'text-red-500'}`}>
-                  {tx.status}
-                </div>
-                <div className="text-sm text-gray-500">
-                  {tx.txHash && (
+                {tx.txHash && (
+                  <div className="mt-2 pl-2 border-l-2 border-[#7B61FF]/20">
                     <a 
                       href={`https://sepolia.etherscan.io/tx/${tx.txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:text-blue-500"
+                      className="inline-flex items-center gap-2 text-sm text-[#7B61FF] hover:text-[#A78BFA] transition-colors"
                     >
-                      View on Explorer
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      </svg>
+                      View Transaction: {tx.txHash.slice(0, 8)}...{tx.txHash.slice(-6)}
                     </a>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             ))
           )}

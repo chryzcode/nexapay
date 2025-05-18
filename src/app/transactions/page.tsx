@@ -64,15 +64,15 @@ export default function Transactions() {
 
   return (
     <div className={`container mx-auto px-4 md:px-20 py-16 min-h-screen ${isDarkMode ? 'bg-[#0B0F1A]' : 'bg-[#F9F9FB]'}`}>
-      <div className="flex justify-between items-center mb-12">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4">
         <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-[#F9F9FB]' : 'text-[#111827]'}`}>Transactions</h1>
-        <div className="flex gap-3">
-          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="rounded-lg border px-3 py-2 bg-white dark:bg-[#232946] text-base">
+        <div className="flex gap-3 w-full md:w-auto">
+          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="flex-1 md:flex-none rounded-lg border px-3 py-2 bg-white dark:bg-[#232946] text-base">
             <option value="all">All Types</option>
             <option value="sent">Sent</option>
             <option value="received">Received</option>
           </select>
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="rounded-lg border px-3 py-2 bg-white dark:bg-[#232946] text-base">
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="flex-1 md:flex-none rounded-lg border px-3 py-2 bg-white dark:bg-[#232946] text-base">
             <option value="all">All Status</option>
             <option value="pending">Pending</option>
             <option value="completed">Completed</option>
@@ -80,48 +80,57 @@ export default function Transactions() {
           </select>
         </div>
       </div>
-      <div className="overflow-x-auto">
-        <div className={`bg-white/5 backdrop-blur-lg rounded-xl border border-white/10 overflow-hidden ${isDarkMode ? '' : 'bg-white border-gray-200 shadow-md'}`}
-          style={{ padding: '2.5rem 2rem' }}>
-          <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-gray-400 font-medium mb-8 ${isDarkMode ? 'text-[#F9F9FB]' : 'text-[#111827]'}`}> 
-            <div>Date</div>
-            <div>Description</div>
-            <div>Amount</div>
-            <div>Status</div>
+      <div className="relative">
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+          <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500 px-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 animate-pulse">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
           </div>
-          {filtered.length === 0 ? (
-            <div className={`text-center py-16 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No transactions found</div>
-          ) : (
-            filtered.map((tx, idx) => (
-              <div key={idx} className="space-y-2 py-4 border-b last:border-b-0 border-gray-100 dark:border-[#232946]">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 items-center">
-                  <div>{new Date(tx.createdAt).toLocaleDateString()}</div>
-                  <div>{tx.type === 'sent' ? `To ${tx.recipient.slice(0, 6)}...${tx.recipient.slice(-4)}` : `From ${tx.sender.slice(0, 6)}...${tx.sender.slice(-4)}`}</div>
-                  <div className="font-semibold">
-                    {tx.type === 'sent' ? '-' : '+'}${tx.amount} {tx.currency}
+        </div>
+        <div className="overflow-x-auto">
+          <div className={`bg-white/5 backdrop-blur-lg rounded-xl border border-white/10 overflow-hidden ${isDarkMode ? '' : 'bg-white border-gray-200 shadow-md'}`}
+            style={{ padding: '2.5rem 2rem', minWidth: '800px' }}>
+            <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-gray-400 font-medium mb-8 ${isDarkMode ? 'text-[#F9F9FB]' : 'text-[#111827]'}`}> 
+              <div>Date</div>
+              <div>Description</div>
+              <div>Amount</div>
+              <div>Status</div>
+            </div>
+            {filtered.length === 0 ? (
+              <div className={`text-center py-16 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No transactions found</div>
+            ) : (
+              filtered.map((tx, idx) => (
+                <div key={idx} className="space-y-2 py-4 border-b last:border-b-0 border-gray-100 dark:border-[#232946]">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 items-center">
+                    <div>{new Date(tx.createdAt).toLocaleDateString()}</div>
+                    <div>{tx.type === 'sent' ? `To ${tx.recipient.slice(0, 6)}...${tx.recipient.slice(-4)}` : `From ${tx.sender.slice(0, 6)}...${tx.sender.slice(-4)}`}</div>
+                    <div className="font-semibold">
+                      {tx.type === 'sent' ? '-' : '+'}${tx.amount} {tx.currency}
+                    </div>
+                    <div className={`capitalize font-medium ${tx.status === 'completed' ? 'text-green-500' : tx.status === 'pending' ? 'text-yellow-500' : 'text-red-500'}`}>
+                      {tx.status}
+                    </div>
                   </div>
-                  <div className={`capitalize font-medium ${tx.status === 'completed' ? 'text-green-500' : tx.status === 'pending' ? 'text-yellow-500' : 'text-red-500'}`}>
-                    {tx.status}
-                  </div>
+                  {tx.txHash && (
+                    <div className="mt-2 pl-2 border-l-2 border-[#7B61FF]/20">
+                      <a 
+                        href={`https://sepolia.etherscan.io/tx/${tx.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-sm text-[#7B61FF] hover:text-[#A78BFA] transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                        </svg>
+                        View Transaction: {tx.txHash.slice(0, 8)}...{tx.txHash.slice(-6)}
+                      </a>
+                    </div>
+                  )}
                 </div>
-                {tx.txHash && (
-                  <div className="mt-2 pl-2 border-l-2 border-[#7B61FF]/20">
-                    <a 
-                      href={`https://sepolia.etherscan.io/tx/${tx.txHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm text-[#7B61FF] hover:text-[#A78BFA] transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                      </svg>
-                      View Transaction: {tx.txHash.slice(0, 8)}...{tx.txHash.slice(-6)}
-                    </a>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>

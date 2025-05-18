@@ -25,7 +25,7 @@ export default function Dashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const { isDarkMode } = useTheme();
-  const { account, setAccount } = useWallet();
+  const { account, setAccount, disconnectWallet } = useWallet();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -114,9 +114,11 @@ export default function Dashboard() {
   }
 
   return (
-    <div className={`relative min-h-screen px-4 sm:px-8 md:px-16 py-8 flex flex-col items-center ${isDarkMode ? 'bg-[#10111b]' : 'bg-gradient-to-br from-[#f9f9fb] via-[#e7e7f6] to-[#f2e6ff]'}`}>
-      {/* Navbar blur overlay removed since header backdrop-blur-sm is used */}
-      <h1 className={`text-4xl font-extrabold mb-8 tracking-tight text-center ${isDarkMode ? 'text-white' : 'text-[#1a1445]'}`}>Dashboard</h1>
+    <div className={`container mx-auto px-4 md:px-20 py-16 min-h-screen ${isDarkMode ? 'bg-[#0B0F1A]' : 'bg-[#F9F9FB]'}`}>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4">
+        <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-[#F9F9FB]' : 'text-[#111827]'}`}>Dashboard</h1>
+      </div>
+
       {/* Cards Section: Balance | Quick Actions | Transactions */}
       <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch mb-10">
         <AnimatePresence>
@@ -134,9 +136,25 @@ export default function Dashboard() {
             <FaWallet className="text-5xl mb-3 text-[#7B61FF] drop-shadow-lg" />
             <div className="text-3xl md:text-5xl font-bold mb-2 tracking-tight">${usdTotal} <span className="text-base md:text-lg font-medium text-gray-400">USD</span></div>
             <div className="text-base md:text-lg font-mono text-gray-400">{ethBalance} ETH</div>
-            {account && <div className="mt-4 text-xs text-gray-400 font-mono break-all md:break-normal truncate max-w-[90vw] md:max-w-none">Connected: {account}</div>}
-            {!account && (
-              <div className="flex justify-end mt-4 w-full">
+            {account ? (
+              <div className="mt-4 flex flex-col items-center gap-2">
+                <div className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-[#232946] border border-gray-200 dark:border-gray-700">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Connected:</span>
+                  <span className="ml-2 text-sm font-medium">{account.slice(0, 6)}...{account.slice(-4)}</span>
+                </div>
+                <button
+                  onClick={() => setShowDisconnectModal(true)}
+                  className="text-xs text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 transition-colors flex items-center gap-1"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-9A2.25 2.25 0 002.25 5.25v13.5A2.25 2.25 0 004.5 21h9a2.25 2.25 0 002.25-2.25V15" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 15l3-3m0 0l-3-3m3 3H9" />
+                  </svg>
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              <div className="mt-4">
                 {typeof window !== "undefined" && <WalletConnect />}
               </div>
             )}
@@ -181,10 +199,10 @@ export default function Dashboard() {
             style={{ minHeight: 140 }}
           >
             <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-gradient-to-br from-[#A78BFA]/30 to-[#7B61FF]/10 rounded-full blur-2xl opacity-60"></div>
-            <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2"><FaMoneyBillWave className="text-[#A78BFA]" /> Recent Transactions</h2>
+            <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2 justify-center"><FaMoneyBillWave className="text-[#A78BFA]" /> Recent Transactions</h2>
             <div className="flex-1 flex flex-col">
               {transactions.length === 0 ? (
-                <div className="flex flex-col items-center justify-center flex-1">
+                <div className="flex flex-col items-center justify-center flex-1 py-8">
                   <svg width="48" height="48" fill="none" className="mb-2 opacity-40">
                     <rect width="48" height="48" rx="24" fill="#A78BFA" fillOpacity="0.13"/>
                     <path d="M16 24h16M24 16v16" stroke="#7B61FF" strokeWidth="2.5" strokeLinecap="round"/>
@@ -196,17 +214,17 @@ export default function Dashboard() {
                   {transactions.slice(0, 5).map((tx: any, idx: number) => (
                     <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-white/5 dark:bg-[#232946]/20 border border-white/10">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${tx.type === 'sent' ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-500'}`}>
-                          {tx.type === 'sent' ? <FaArrowUp /> : <FaArrowDown />}
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tx.type === 'sent' ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-500'}`}>
+                          {tx.type === 'sent' ? <FaArrowUp className="w-4 h-4" /> : <FaArrowDown className="w-4 h-4" />}
                         </div>
                         <div>
-                          <div className="font-medium">
+                          <div className="text-sm font-medium">
                             {tx.type === 'sent' ? 'Sent to' : 'Received from'} {tx.type === 'sent' ? tx.recipient.slice(0, 6) + '...' + tx.recipient.slice(-4) : tx.sender.slice(0, 6) + '...' + tx.sender.slice(-4)}
                           </div>
-                          <div className="text-sm text-gray-400">{new Date(tx.createdAt).toLocaleDateString()}</div>
+                          <div className="text-xs text-gray-400">{new Date(tx.createdAt).toLocaleDateString()}</div>
                         </div>
                       </div>
-                      <div className={`font-semibold ${tx.type === 'sent' ? 'text-red-500' : 'text-green-500'}`}>
+                      <div className={`text-sm font-semibold ${tx.type === 'sent' ? 'text-red-500' : 'text-green-500'}`}>
                         {tx.type === 'sent' ? '-' : '+'}${tx.amount} {tx.currency}
                       </div>
                     </div>
@@ -270,7 +288,7 @@ export default function Dashboard() {
               <p className="mb-4 text-lg">Disconnect your wallet?</p>
               <button
                 className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-500 text-white py-2 px-4 rounded-lg font-medium hover:from-red-600 hover:to-pink-600 transition-colors"
-                onClick={() => { if (typeof window !== "undefined") { window.localStorage.removeItem("walletAccount"); } setAccount(null); setShowDisconnectModal(false); }}
+                onClick={() => { disconnectWallet(); setShowDisconnectModal(false); }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-9A2.25 2.25 0 002.25 5.25v13.5A2.25 2.25 0 004.5 21h9a2.25 2.25 0 002.25-2.25V15" />

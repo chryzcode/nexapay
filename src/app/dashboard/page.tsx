@@ -12,6 +12,7 @@ import { FaArrowUp, FaArrowDown, FaWallet, FaMoneyBillWave } from "react-icons/f
 import DashboardAnalytics from "../components/DashboardAnalytics";
 import RequestMoneyForm from "../components/RequestMoneyForm";
 import RequestsDashboard from "../components/RequestsDashboard";
+import { toast } from "react-toastify";
 
 const WalletConnect = dynamic(() => import('../components/WalletConnect'), {
   ssr: false,
@@ -42,29 +43,118 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchBalanceAndUsd() {
-      if (!account || typeof window === "undefined" || !(window as any).ethereum) {
+      if (!account) {
         setUsdTotal("0.00");
         setEthBalance("0.00");
         return;
       }
-      const web3 = new Web3((window as any).ethereum);
-      let eth = 0;
-      let usd = 0;
+
       try {
+        // Always fetch ETH price
         const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd");
         const data = await res.json();
         const ethPrice = data.ethereum.usd;
-        const raw = await web3.eth.getBalance(account);
-        eth = Number(web3.utils.fromWei(raw, "ether"));
-        usd = eth * ethPrice;
-        setEthBalance(eth.toFixed(6));
-        setUsdTotal(usd.toFixed(2));
-      } catch {
+
+        // If MetaMask is available, get the balance directly
+        if (typeof window !== "undefined" && (window as any).ethereum) {
+          const web3 = new Web3((window as any).ethereum);
+          const raw = await web3.eth.getBalance(account);
+          const eth = Number(web3.utils.fromWei(raw, "ether"));
+          const usd = eth * ethPrice;
+          setEthBalance(eth.toFixed(6));
+          setUsdTotal(usd.toFixed(2));
+
+          // Update the balance in the database if we have a user ID
+          if (currentUserId) {
+            try {
+              await fetch('/api/wallet/balance', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  address: account,
+                  balance: eth.toString(),
+                  userId: currentUserId,
+                }),
+              });
+            } catch (error) {
+              console.error('Error updating balance in database:', error);
+            }
+          }
+        } else {
+          // If no MetaMask, try to get the last known balance from the database
+          if (currentUserId) {
+            try {
+              const balanceRes = await fetch(`/api/wallet/balance?address=${account}&userId=${currentUserId}`);
+              if (balanceRes.ok) {
+                const balanceData = await balanceRes.json();
+                if (balanceData.balance) {
+                  const eth = Number(balanceData.balance);
+                  const usd = eth * ethPrice;
+                  setEthBalance(eth.toFixed(6));
+                  setUsdTotal(usd.toFixed(2));
+                  return;
+                }
+              }
+            } catch (error) {
+              console.error('Error fetching balance from database:', error);
+            }
+          }
+          // If we couldn't get the balance from the database, show 0
+          setEthBalance("0.00");
+          setUsdTotal("0.00");
+        }
+      } catch (error) {
+        console.error('Error fetching balance:', error);
         setUsdTotal("0.00");
         setEthBalance("0.00");
       }
     }
+
+    // Initial fetch
     fetchBalanceAndUsd();
+
+    // Only set up polling if MetaMask is available
+    let intervalId: NodeJS.Timeout | undefined;
+    if (typeof window !== "undefined" && (window as any).ethereum) {
+      intervalId = setInterval(fetchBalanceAndUsd, 60000); // Update every minute
+    }
+
+    // Cleanup interval on unmount
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [account, currentUserId]);
+
+  // Set up event listener for account changes
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as any).ethereum) {
+      const handleAccountsChanged = (accounts: string[]) => {
+        if (accounts.length === 0) {
+          // User disconnected their wallet
+          setAccount(null);
+        } else if (accounts[0] !== account) {
+          // Account changed
+          setAccount(accounts[0]);
+        }
+      };
+
+      const handleChainChanged = () => {
+        // Reload the page when the chain changes
+        window.location.reload();
+      };
+
+      (window as any).ethereum.on('accountsChanged', handleAccountsChanged);
+      (window as any).ethereum.on('chainChanged', handleChainChanged);
+
+      return () => {
+        (window as any).ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        (window as any).ethereum.removeListener('chainChanged', handleChainChanged);
+      };
+    }
   }, [account]);
 
   useEffect(() => {
@@ -134,8 +224,13 @@ export default function Dashboard() {
           >
             <div className="absolute -top-8 -left-8 w-32 h-32 bg-gradient-to-br from-[#7B61FF]/30 to-[#A78BFA]/20 rounded-full blur-2xl opacity-60"></div>
             <FaWallet className="text-5xl mb-3 text-[#7B61FF] drop-shadow-lg" />
-            <div className="text-3xl md:text-5xl font-bold mb-2 tracking-tight">${usdTotal} <span className="text-base md:text-lg font-medium text-gray-400">USD</span></div>
-            <div className="text-base md:text-lg font-mono text-gray-400">{ethBalance} ETH</div>
+            <div className="flex flex-col items-center">
+              <div className="text-3xl md:text-5xl font-bold tracking-tight flex items-baseline">
+                <span>${usdTotal}</span>
+                <span className="text-base md:text-lg font-medium text-gray-400 ml-2">USD</span>
+              </div>
+              <div className="text-base md:text-lg font-mono text-gray-400 mt-1">{ethBalance} ETH</div>
+            </div>
             {account ? (
               <div className="mt-4 flex flex-col items-center gap-2">
                 <div className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-[#232946] border border-gray-200 dark:border-gray-700">
@@ -175,13 +270,41 @@ export default function Dashboard() {
             <div className="flex flex-col gap-4 w-full items-center">
               <button
                 className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white py-3 px-6 rounded-2xl font-semibold text-lg shadow-lg hover:from-[#6B51EF] hover:to-[#9771FA] transition-all focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/40"
-                onClick={() => setShowPaymentModal(true)}
+                onClick={() => {
+                  if (typeof window !== "undefined" && (window as any).ethereum) {
+                    setShowPaymentModal(true);
+                  } else {
+                    toast.error('Please install MetaMask to send payments', {
+                      position: "bottom-center",
+                      autoClose: 4000,
+                      hideProgressBar: false,
+                      closeOnClick: true,
+                      pauseOnHover: true,
+                      draggable: true,
+                      theme: "dark",
+                    });
+                  }
+                }}
               >
                 <FaArrowUp className="w-6 h-6" /> Send Money
               </button>
               <button
                 className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-[#A78BFA] to-[#7B61FF] text-white py-3 px-6 rounded-2xl font-semibold text-lg shadow-lg hover:from-[#9771FA] hover:to-[#6B51EF] transition-all focus:outline-none focus:ring-2 focus:ring-[#A78BFA]/40"
-                onClick={() => setShowRequestModal(true)}
+                onClick={() => {
+                  if (typeof window !== "undefined" && (window as any).ethereum) {
+                    setShowRequestModal(true);
+                  } else {
+                    toast.error('Please install MetaMask to request payments', {
+                      position: "bottom-center",
+                      autoClose: 4000,
+                      hideProgressBar: false,
+                      closeOnClick: true,
+                      pauseOnHover: true,
+                      draggable: true,
+                      theme: "dark",
+                    });
+                  }
+                }}
               >
                 <FaArrowDown className="w-6 h-6" /> Request Money
               </button>
@@ -225,7 +348,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div className={`text-sm font-semibold ${tx.type === 'sent' ? 'text-red-500' : 'text-green-500'}`}>
-                        {tx.type === 'sent' ? '-' : '+'}${tx.amount} {tx.currency}
+                        {tx.type === 'sent' ? '-' : '+'}{tx.amount} {tx.currency}
                       </div>
                     </div>
                   ))}

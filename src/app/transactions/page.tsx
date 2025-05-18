@@ -90,8 +90,8 @@ export default function Transactions() {
         </div>
         <div className="overflow-x-auto">
           <div className={`bg-white/5 backdrop-blur-lg rounded-xl border border-white/10 overflow-hidden ${isDarkMode ? '' : 'bg-white border-gray-200 shadow-md'}`}
-            style={{ padding: '2.5rem 2rem', minWidth: '800px' }}>
-            <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-gray-400 font-medium mb-8 ${isDarkMode ? 'text-[#F9F9FB]' : 'text-[#111827]'}`}> 
+            style={{ minWidth: '800px' }}>
+            <div className={`grid grid-cols-4 gap-6 text-gray-400 font-medium mb-8 px-8 py-6 ${isDarkMode ? 'text-[#F9F9FB]' : 'text-[#111827]'}`}> 
               <div>Date</div>
               <div>Description</div>
               <div>Amount</div>
@@ -101,8 +101,8 @@ export default function Transactions() {
               <div className={`text-center py-16 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No transactions found</div>
             ) : (
               filtered.map((tx, idx) => (
-                <div key={idx} className="space-y-2 py-4 border-b last:border-b-0 border-gray-100 dark:border-[#232946]">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 items-center">
+                <div key={idx} className="space-y-2 py-4 border-b last:border-b-0 border-gray-100 dark:border-[#232946] px-8">
+                  <div className="grid grid-cols-4 gap-6 items-center">
                     <div>{new Date(tx.createdAt).toLocaleDateString()}</div>
                     <div>{tx.type === 'sent' ? `To ${tx.recipient.slice(0, 6)}...${tx.recipient.slice(-4)}` : `From ${tx.sender.slice(0, 6)}...${tx.sender.slice(-4)}`}</div>
                     <div className="font-semibold">

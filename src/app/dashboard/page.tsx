@@ -334,20 +334,20 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
-                  {transactions.slice(0, 5).map((tx: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-white/5 dark:bg-[#232946]/20 border border-white/10">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tx.type === 'sent' ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-500'}`}>
+                  {transactions.slice(0, 3).map((tx: any) => (
+                    <div key={tx._id || tx.txHash} className="flex items-center justify-between p-3 rounded-lg bg-white/5 dark:bg-[#232946]/20 border border-white/10 min-h-[60px]">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${tx.type === 'sent' ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-500'}`}>
                           {tx.type === 'sent' ? <FaArrowUp className="w-4 h-4" /> : <FaArrowDown className="w-4 h-4" />}
                         </div>
-                        <div>
-                          <div className="text-sm font-medium">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium truncate">
                             {tx.type === 'sent' ? 'Sent to' : 'Received from'} {tx.type === 'sent' ? tx.recipient.slice(0, 6) + '...' + tx.recipient.slice(-4) : tx.sender.slice(0, 6) + '...' + tx.sender.slice(-4)}
                           </div>
                           <div className="text-xs text-gray-400">{new Date(tx.createdAt).toLocaleDateString()}</div>
                         </div>
                       </div>
-                      <div className={`text-sm font-semibold ${tx.type === 'sent' ? 'text-red-500' : 'text-green-500'}`}>
+                      <div className={`text-sm font-semibold ml-4 flex-shrink-0 ${tx.type === 'sent' ? 'text-red-500' : 'text-green-500'}`}>
                         {tx.type === 'sent' ? '-' : '+'}{tx.amount} {tx.currency}
                       </div>
                     </div>
@@ -359,39 +359,45 @@ export default function Dashboard() {
         </AnimatePresence>
       </div>
 
-      {/* Requests Dashboard and Analytics - stacked vertically, no glassmorphism */}
+      {/* Requests Dashboard and Analytics - separate cards with simplified structure */}
       <div className="w-full max-w-7xl flex flex-col gap-8 items-stretch mt-2 mb-16">
         <motion.div
-          className="rounded-3xl bg-white dark:bg-[#18192b] shadow-2xl border border-white/20 flex flex-col justify-start relative overflow-hidden p-0"
+          className="rounded-3xl bg-white dark:bg-[#18192b] shadow-2xl border border-white/20 p-8"
           initial="hidden"
           animate="visible"
           variants={cardVariants}
           custom={3}
           exit="hidden"
-          style={{ minHeight: 140 }}
         >
-          <div className="p-8 h-full flex flex-col justify-start">
-            <RequestsDashboard currentUserId={currentUserId} />
-          </div>
+          <RequestsDashboard currentUserId={currentUserId} />
         </motion.div>
+
         <motion.div
-          className="rounded-3xl bg-white dark:bg-[#18192b] shadow-2xl border border-white/20 flex flex-col justify-start relative overflow-hidden p-0"
+          className="rounded-3xl bg-white dark:bg-[#18192b] shadow-2xl border border-white/20 p-8"
           initial="hidden"
           animate="visible"
           variants={cardVariants}
           custom={4}
           exit="hidden"
-          style={{ minHeight: 140 }}
         >
-          <div className="p-8 h-full flex flex-col justify-start">
-            <DashboardAnalytics transactions={transactions} />
-          </div>
+          <DashboardAnalytics transactions={transactions} />
         </motion.div>
       </div>
       {/* Payment Modal */}
-      {showPaymentModal && <PaymentForm onClose={() => setShowPaymentModal(false)} />}
+      {showPaymentModal && <PaymentForm onClose={() => setShowPaymentModal(false)} onSuccess={() => setShowPaymentModal(false)} />}
       {/* Request Modal */}
-      {showRequestModal && <RequestMoneyForm onClose={() => setShowRequestModal(false)} />}
+      {showRequestModal && (
+        <RequestMoneyForm 
+          onClose={() => setShowRequestModal(false)} 
+          onSuccess={() => {
+            setShowRequestModal(false);
+            // Trigger a refresh of the requests list
+            const event = new CustomEvent('refreshRequests');
+            window.dispatchEvent(event);
+          }} 
+          currentUserId={currentUserId} 
+        />
+      )}
       {/* Disconnect Modal */}
       {showDisconnectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">

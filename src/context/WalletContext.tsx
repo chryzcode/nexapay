@@ -2,118 +2,162 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { toast } from 'react-hot-toast';
 
 interface WalletContextType {
   account: string | null;
   setAccount: (account: string | null) => void;
-  disconnectWallet: () => void;
+  connectWallet: () => Promise<void>;
+  disconnectWallet: () => Promise<void>;
+  isConnecting: boolean;
 }
 
 const WalletContext = createContext<WalletContextType>({
   account: null,
   setAccount: () => {},
-  disconnectWallet: () => {},
+  connectWallet: async () => {},
+  disconnectWallet: async () => {},
+  isConnecting: false,
 });
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [account, setAccount] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
   const { user } = useAuth();
 
-  // Load saved wallet on mount and when user changes
+  // Load wallet on mount if user is logged in
   useEffect(() => {
-    async function loadWallet() {
-      if (typeof window !== 'undefined' && user?.id) {
-        try {
-          console.log('Loading wallet for user:', user.id);
-          // First try to get from database
-          const response = await fetch(`/api/wallet/connect?userId=${user.id}`);
-          if (response.ok) {
-            const data = await response.json();
-            console.log('Wallet data from API:', data);
-            if (data.walletAddress) {
-              setAccount(data.walletAddress);
-              localStorage.setItem('walletAccount', data.walletAddress);
-              return;
-            }
-          }
-          
-          // Fallback to localStorage
-          const savedAccount = localStorage.getItem('walletAccount');
-          if (savedAccount) {
-            setAccount(savedAccount);
-          }
-        } catch (error) {
-          console.error('Error loading wallet:', error);
-        }
-      }
+    if (user?.id) {
+      loadStoredWallet();
     }
-
-    loadWallet();
   }, [user]);
 
-  // Save wallet to database when connected
-  useEffect(() => {
-    async function saveWallet() {
-      if (account && user?.id) {
-        try {
-          console.log('Saving wallet for user:', user.id, 'address:', account);
-          const response = await fetch('/api/wallet/connect', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              userId: user.id,
-              walletAddress: account,
-            }),
-          });
+  const loadStoredWallet = async () => {
+    try {
+      const response = await fetch(`/api/wallet/connect?userId=${user?.id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-          if (!response.ok) {
-            console.error('Failed to save wallet to database');
-            const errorData = await response.json();
-            console.error('Error details:', errorData);
-          } else {
-            localStorage.setItem('walletAccount', account);
-          }
-        } catch (error) {
-          console.error('Error saving wallet:', error);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.walletAddress) {
+          setAccount(data.walletAddress);
+          console.log('Loaded stored wallet:', data.walletAddress);
         }
       }
+    } catch (error) {
+      console.error('Error loading stored wallet:', error);
+    }
+  };
+
+  const connectWallet = async () => {
+    if (!user?.id) {
+      toast.error("Please log in to connect your wallet", {
+        position: "bottom-center",
+        duration: 4000,
+      });
+      return;
     }
 
-    saveWallet();
-  }, [account, user]);
+    if (typeof window === "undefined" || !window.ethereum) {
+      toast.error("Please install MetaMask to connect your wallet", {
+        position: "bottom-center",
+        duration: 4000,
+      });
+      return;
+    }
+
+    setIsConnecting(true);
+    try {
+      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      const connectedAccount = accounts[0];
+
+      // Update user document in the database with the wallet address
+      const response = await fetch("/api/wallet/connect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          walletAddress: connectedAccount,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update wallet address in the database");
+      }
+
+      setAccount(connectedAccount);
+      toast.success("Wallet connected successfully!", {
+        position: "bottom-center",
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+      toast.error("Failed to connect wallet", {
+        position: "bottom-center",
+        duration: 4000,
+      });
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
   const disconnectWallet = async () => {
-    if (user?.id) {
-      try {
-        console.log('Disconnecting wallet for user:', user.id);
-        const response = await fetch('/api/wallet/connect', {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: user.id,
-          }),
-        });
+    if (!user?.id) return;
 
-        if (!response.ok) {
-          console.error('Failed to remove wallet from database');
-          const errorData = await response.json();
-          console.error('Error details:', errorData);
-        }
-      } catch (error) {
-        console.error('Error removing wallet:', error);
+    try {
+      // First, clear the wallet from the database
+      const response = await fetch("/api/wallet/disconnect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.id
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to disconnect wallet");
       }
-    }
 
-    localStorage.removeItem('walletAccount');
-    setAccount(null);
+      // Clear local state
+      setAccount(null);
+
+      // Clear any stored wallet data
+      localStorage.removeItem('walletAccount');
+      sessionStorage.removeItem('walletAccount');
+
+      toast.success("Wallet disconnected successfully", {
+        position: "bottom-center",
+        duration: 3000,
+      });
+
+      // Force a page reload to ensure clean state
+      window.location.reload();
+    } catch (error) {
+      console.error("Error disconnecting wallet:", error);
+      toast.error("Failed to disconnect wallet", {
+        position: "bottom-center",
+        duration: 4000,
+      });
+    }
   };
 
   return (
-    <WalletContext.Provider value={{ account, setAccount, disconnectWallet }}>
+    <WalletContext.Provider value={{ 
+      account, 
+      setAccount, 
+      connectWallet, 
+      disconnectWallet,
+      isConnecting 
+    }}>
       {children}
     </WalletContext.Provider>
   );

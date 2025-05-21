@@ -53,6 +53,8 @@ export async function GET() {
           createdAt: transaction.createdAt,
           sender: transaction.senderId,
           recipient: transaction.recipientId,
+          senderWallet: transaction.senderWallet,
+          recipientWallet: transaction.recipientWallet,
           currency: transaction.currency || 'ETH',
           network: transaction.network,
           txHash: transaction.txHash
@@ -105,25 +107,96 @@ export async function POST(request: Request) {
 
       const client = await db;
       const transactions = client.db().collection("transactions");
+      const users = client.db().collection("users");
+      let senderWallet = null;
+      let recipientWallet = null;
+      if (senderId) {
+        const senderUser = await users.findOne({ _id: new ObjectId(senderId) });
+        senderWallet = senderUser?.walletAddress || null;
+      }
+      if (recipientId) {
+        const recipientUser = await users.findOne({ _id: new ObjectId(recipientId) });
+        recipientWallet = recipientUser?.walletAddress || null;
+      }
 
-      // Create transaction
-      const result = await transactions.insertOne({
-        amount,
-        type,
-        status: status || "pending",
-        senderId: senderId || userId,
-        recipientId,
-        txHash,
-        currency: currency || 'ETH',
-        network,
-        createdAt: createdAt || new Date(),
-        updatedAt: new Date(),
-      });
-
-      return NextResponse.json({
-        message: "Transaction created successfully",
-        transactionId: result.insertedId.toString(),
-      });
+      // If this is a payment (type === 'sent'), create both 'sent' and 'received' records
+      if (type === 'sent') {
+        // Sent record for sender
+        const sentResult = await transactions.insertOne({
+          amount,
+          type: 'sent',
+          status: status || "completed",
+          senderId: senderId || userId,
+          recipientId,
+          senderWallet,
+          recipientWallet,
+          txHash,
+          currency: currency || 'ETH',
+          network,
+          createdAt: createdAt || new Date(),
+          updatedAt: new Date(),
+        });
+        // Received record for recipient
+        const receivedResult = await transactions.insertOne({
+          amount,
+          type: 'received',
+          status: status || "completed",
+          senderId: senderId || userId,
+          recipientId,
+          senderWallet,
+          recipientWallet,
+          txHash,
+          currency: currency || 'ETH',
+          network,
+          createdAt: createdAt || new Date(),
+          updatedAt: new Date(),
+        });
+        return NextResponse.json({
+          message: "Transaction created successfully",
+          sentTransactionId: sentResult.insertedId.toString(),
+          receivedTransactionId: receivedResult.insertedId.toString(),
+        });
+      } else if (type === 'received') {
+        // For requests, only create a 'received' record for the recipient
+        const result = await transactions.insertOne({
+          amount,
+          type: 'received',
+          status: status || "pending",
+          senderId: senderId || userId,
+          recipientId,
+          senderWallet,
+          recipientWallet,
+          txHash,
+          currency: currency || 'ETH',
+          network,
+          createdAt: createdAt || new Date(),
+          updatedAt: new Date(),
+        });
+        return NextResponse.json({
+          message: "Transaction created successfully",
+          transactionId: result.insertedId.toString(),
+        });
+      } else {
+        // Fallback: create a single record as before
+        const result = await transactions.insertOne({
+          amount,
+          type,
+          status: status || "pending",
+          senderId: senderId || userId,
+          recipientId,
+          senderWallet,
+          recipientWallet,
+          txHash,
+          currency: currency || 'ETH',
+          network,
+          createdAt: createdAt || new Date(),
+          updatedAt: new Date(),
+        });
+        return NextResponse.json({
+          message: "Transaction created successfully",
+          transactionId: result.insertedId.toString(),
+        });
+      }
     } catch (error) {
       return NextResponse.json(
         { error: "Invalid token" },

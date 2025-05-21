@@ -11,9 +11,24 @@ export async function GET(request: NextRequest) {
 
     const client = await dbPromise;
     const db = client.db();
-    const user = await db.collection('users').findOne({ _id: new ObjectId(userId) });
+    
+    // Convert userId to ObjectId if it's a valid MongoDB ID
+    let query = { _id: new ObjectId(userId) };
+    const user = await db.collection('users').findOne(query);
 
-    return NextResponse.json({ walletAddress: user?.walletAddress || null });
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    if (!user.walletAddress) {
+      return NextResponse.json({ error: 'User has not connected their wallet' }, { status: 400 });
+    }
+
+    return NextResponse.json({ 
+      walletAddress: user.walletAddress,
+      username: user.username,
+      userCode: user.userCode
+    });
   } catch (error) {
     console.error('Error fetching wallet:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

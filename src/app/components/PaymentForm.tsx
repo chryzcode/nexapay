@@ -159,7 +159,8 @@ interface RecipientResolution {
 }
 
 interface PaymentFormProps {
-  onClose?: () => void;
+  onClose: () => void;
+  onSuccess?: () => void;
   srcChainId?: number;
   dstChainId?: number;
 }
@@ -177,7 +178,8 @@ const CHAIN_OPTIONS = [
 
 export default function PaymentForm({ 
   onClose, 
-  srcChainId = 11155111, // Default to Sepolia
+  onSuccess,
+  srcChainId = 11155111,
   dstChainId = 11155111 
 }: PaymentFormProps) {
   const { isDarkMode } = useTheme();
@@ -199,6 +201,33 @@ export default function PaymentForm({
   // Add these state variables near the top of the component
   const [ethAmount, setEthAmount] = useState<number | null>(null);
   const [ethPrice, setEthPrice] = useState<number | null>(null);
+
+  const [requestId, setRequestId] = useState<string | null>(null);
+
+  // Listen for payment modal open event
+  useEffect(() => {
+    const handleOpenPaymentModal = (event: CustomEvent) => {
+      const { recipient, amount, note, requestId: reqId } = event.detail;
+      if (recipient) {
+        setRecipientInput(recipient);
+        setIdentifierType(IdentifierType.USER_ID);
+      }
+      if (amount) {
+        setAmount(amount.toString());
+      }
+      if (note) {
+        setReference(note);
+      }
+      if (reqId) {
+        setRequestId(reqId);
+      }
+    };
+
+    window.addEventListener('openPaymentModal', handleOpenPaymentModal as EventListener);
+    return () => {
+      window.removeEventListener('openPaymentModal', handleOpenPaymentModal as EventListener);
+    };
+  }, []);
 
   // Helper to get chain name
   function getChainName(chainId: number) {
@@ -434,7 +463,7 @@ export default function PaymentForm({
 
       try {
         // Send ETH
-        const tx = await web3Nexa.eth.sendTransaction({
+        const receipt = await web3Nexa.eth.sendTransaction({
           from,
           to: checksummedRecipient,
           value: weiAmount,
@@ -442,7 +471,32 @@ export default function PaymentForm({
           gasPrice: adjustedGasPrice
         });
 
-        console.log('ETH transfer successful:', tx.transactionHash);
+        console.log('Transaction successful:', receipt);
+        toast.success('Payment sent successfully!');
+
+        // Update request status if this was a payment for a request
+        if (requestId) {
+          try {
+            const response = await fetch(`/api/requests/${requestId}/approve`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                txHash: receipt.transactionHash,
+                amount: usdAmount
+              })
+            });
+
+            if (!response.ok) {
+              console.error('Failed to update request status');
+            }
+          } catch (err) {
+            console.error('Error updating request status:', err);
+          }
+        }
+
+        onSuccess?.();
 
         // Get recipient's user ID from their wallet address
         const recipientRes = await fetch('/api/resolve-identifier', {
@@ -477,7 +531,7 @@ export default function PaymentForm({
               recipientId: recipientUserId,
               type: 'sent',
               status: 'completed',
-              txHash: tx.transactionHash,
+              txHash: receipt.transactionHash,
               currency: 'ETH',
               network: chainId,
               senderId: currentUserId,
@@ -516,106 +570,113 @@ export default function PaymentForm({
     } finally {
       setSending(false);
     }
-  }, [recipientResolution, amount, reference, onClose, currentUserId]);
+  }, [recipientResolution, amount, reference, onClose, currentUserId, onSuccess, requestId]);
 
   return (
-    <div className="fixed inset-0 flex items-start justify-center z-[9999] pointer-events-auto" style={{ paddingTop: '50px' }}>
-      {/* Optional translucent overlay for modal effect */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" style={{ zIndex: 0 }}></div>
-      <div className={`relative bg-white/5 border border-white/10 rounded-xl p-8 w-full max-w-lg shadow-2xl ${isDarkMode ? 'bg-[#18192b] text-white' : 'bg-white text-[#18192b]'}`}
-        style={{ zIndex: 1 }}>
-        <h3 className="text-3xl font-extrabold mb-6 text-[#7B61FF] tracking-tight text-center">Send Payment</h3>
-        <form onSubmit={handleSend} className="space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-white dark:bg-[#18192b] rounded-xl shadow-lg p-6 w-full max-w-md relative">
+        <button
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+          onClick={onClose}
+          aria-label="Close"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <h2 className="text-2xl font-bold mb-6">Send Payment</h2>
+        <form onSubmit={handleSend} className="flex flex-col gap-6">
           <div>
-            <label className="block text-sm font-semibold mb-1">Recipient Type</label>
-            <select
-              value={identifierType}
-              onChange={e => setIdentifierType(e.target.value as IdentifierType)}
-              className="w-full px-3 py-2 border rounded-lg bg-transparent"
-            >
-              {IDENTIFIER_TYPES_LIST.map(type => (
-                <option value={type.value} key={type.value}>{type.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold mb-1">Recipient</label>
-            <input
-              type="text"
-              value={recipientInput}
-              onChange={(e) => {
-                const input = e.target.value;
-                setRecipientInput(input);
-                setRecipientStatus(RecipientStatus.SEARCHING);
-                setRecipientResolution(null);
-              }}
-              placeholder="Enter wallet address, username, or ENS"
-              className="w-full px-3 py-2 border rounded-lg bg-transparent"
-            />
-            {recipientStatus === RecipientStatus.SEARCHING && (
-              <div className="text-sm text-gray-500 mt-1">Resolving recipient...</div>
-            )}
-            {recipientStatus === RecipientStatus.NOT_FOUND && (
-              <div className="text-sm text-red-500 mt-1">Recipient not found</div>
-            )}
-            {recipientStatus === RecipientStatus.FOUND &&
-              recipientResolution?.type != null &&
-              recipientResolution?.address != null && (
-                <div className="text-sm text-green-500 mt-1">
-                  Resolved {String(recipientResolution.type ?? '')}: {String(recipientResolution.address ?? '')}
-                  {recipientResolution.metadata && typeof recipientResolution.metadata.networkHint === 'number'
-                    ? ` (${getNetworkName(recipientResolution.metadata.networkHint)})`
-                    : ''}
-                </div>
-              )}
-          </div>
-          <div>
-            <label className="block text-sm font-semibold mb-1">Amount (USD)</label>
-            <div className="relative">
+            <label className="block text-base font-semibold mb-2">Recipient</label>
+            <div className="flex gap-2">
+              <select 
+                value={identifierType} 
+                onChange={e => {
+                  setIdentifierType(e.target.value as IdentifierType);
+                  setRecipientInput("");
+                  setRecipientStatus(RecipientStatus.IDLE);
+                }} 
+                className={`rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'}`}
+              >
+                {IDENTIFIER_TYPES_LIST.map(type => (
+                  <option value={type.value} key={type.value}>{type.label}</option>
+                ))}
+              </select>
               <input
-                type="number"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg bg-transparent"
-                placeholder="0.00"
+                type="text"
+                value={recipientInput}
+                onChange={(e) => {
+                  const input = e.target.value;
+                  setRecipientInput(input);
+                  setRecipientStatus(RecipientStatus.SEARCHING);
+                  setRecipientResolution(null);
+                }}
+                placeholder={identifierType === IdentifierType.USERNAME ? "Enter username" : identifierType === IdentifierType.USER_ID ? "Enter user code" : "Enter wallet address, username, or ENS"}
+                className={`${recipientStatus === RecipientStatus.FOUND ? 'border-green-500' : recipientStatus === RecipientStatus.NOT_FOUND ? 'border-red-500' : ''}`}
                 required
-                min="0"
-                step="0.01"
               />
-              <div className="absolute right-3 top-2 text-gray-500">USD</div>
             </div>
-            {usdValue && (
-              <div className="mt-2 space-y-1">
-                <div className="text-sm text-gray-500">
-                  <span className="font-medium">Amount in ETH:</span> {ethAmount ? `${ethAmount.toFixed(6)} ETH` : 'Calculating...'}
-                </div>
-                <div className="text-sm text-gray-500">
-                  <span className="font-medium">Current ETH Price:</span> ${ethPrice ? ethPrice.toFixed(2) : 'Loading...'}
-                </div>
-                <div className="text-xs text-blue-400">
-                  ≈ {usdValue} USD
-                </div>
+            {recipientStatus === RecipientStatus.SEARCHING && (
+              <div className="text-sm text-gray-500 mt-1">Validating recipient...</div>
+            )}
+            {recipientStatus === RecipientStatus.FOUND && recipientResolution?.type != null && recipientResolution?.address != null && (
+              <div className="text-sm text-green-500 mt-1">
+                Found user: {String(recipientResolution.type ?? '')}: {String(recipientResolution.address ?? '')}
+                {recipientResolution.metadata && typeof recipientResolution.metadata.networkHint === 'number'
+                  ? ` (${getNetworkName(recipientResolution.metadata.networkHint)})`
+                  : ''}
               </div>
             )}
+            {recipientStatus === RecipientStatus.NOT_FOUND && (
+              <div className="text-sm text-red-500 mt-1">User not found</div>
+            )}
           </div>
           <div>
-            <label className="block text-sm font-semibold mb-1">Reference (optional)</label>
+            <label className="block text-base font-semibold mb-2">Amount</label>
+            <input
+              type="number"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              min="0.01"
+              step="0.01"
+              className={`rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'}`}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-base font-semibold mb-2">Reference <span className="text-gray-400 text-xs">(optional)</span></label>
             <input
               type="text"
               value={reference}
               onChange={e => setReference(e.target.value)}
+              className={`rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'}`}
               placeholder="Order ID, Invoice, etc."
-              className="w-full px-3 py-2 border rounded-lg bg-transparent"
             />
           </div>
           {/* Show sender chain always, recipient chain only if resolved */}
           <div className="text-center text-base font-semibold mb-2">
             {getChainName(srcChainId)} <span className="mx-2">→</span> {recipientInput && recipientResolution?.address ? getChainName(dstChainId) : ''}
           </div>
+          {/* Show USD value and ETH amount */}
+          {usdValue && (
+            <div className="text-sm text-gray-500">
+              <span className="font-medium">Amount in ETH:</span> {ethAmount ? `${ethAmount.toFixed(6)} ETH` : 'Calculating...'}
+            </div>
+          )}
+          {ethPrice && (
+            <div className="text-sm text-gray-500">
+              <span className="font-medium">Current ETH Price:</span> ${ethPrice.toFixed(2)}
+            </div>
+          )}
+          {usdValue && (
+            <div className="text-xs text-blue-400">
+              ≈ {usdValue} USD
+            </div>
+          )}
           <button
             type="submit"
-            disabled={sending || recipientStatus !== 'found'}
-            className="w-full bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white py-3 px-4 rounded-xl font-semibold text-lg shadow-md hover:from-[#6B51EF] hover:to-[#9771FA] transition-colors disabled:opacity-60"
+            className="w-full bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white py-3 rounded-xl font-bold text-lg shadow-lg hover:from-[#6B51EF] hover:to-[#9771FA] transition-all focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/40 disabled:opacity-60"
+            disabled={sending || recipientStatus !== RecipientStatus.FOUND || !amount || isNaN(Number(amount)) || Number(amount) <= 0}
           >
             {sending ? "Sending..." : "Send Payment"}
           </button>

@@ -1,13 +1,28 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "../providers/ThemeProvider";
+import { toast } from "react-toastify";
+import { useAuth } from "@/context/AuthContext";
+import { useWallet } from "@/context/WalletContext";
 
 interface Props {
   onClose: () => void;
   onRequestSent?: () => void;
+  onSuccess?: () => void;
+  currentUserId: string;
 }
 
-export default function RequestMoneyForm({ onClose, onRequestSent }: Props) {
+enum RecipientStatus {
+  IDLE = 'idle',
+  SEARCHING = 'searching',
+  FOUND = 'found',
+  NOT_FOUND = 'not_found',
+  ERROR = 'error'
+}
+
+export default function RequestMoneyForm({ onClose, onRequestSent, onSuccess, currentUserId }: Props) {
   const { isDarkMode } = useTheme();
+  const { user } = useAuth();
+  const { account, connectWallet, isConnecting } = useWallet();
   const [recipient, setRecipient] = useState("");
   const [identifierType, setIdentifierType] = useState("username");
   const [amount, setAmount] = useState("");
@@ -15,6 +30,53 @@ export default function RequestMoneyForm({ onClose, onRequestSent }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [recipientStatus, setRecipientStatus] = useState<RecipientStatus>(RecipientStatus.IDLE);
+  const [recipientDetails, setRecipientDetails] = useState<any>(null);
+
+  // Debounce recipient validation
+  useEffect(() => {
+    const validateRecipient = async () => {
+      if (!recipient) {
+        setRecipientStatus(RecipientStatus.IDLE);
+        setRecipientDetails(null);
+        return;
+      }
+
+      setRecipientStatus(RecipientStatus.SEARCHING);
+      try {
+        const res = await fetch("/api/resolve-identifier", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: identifierType,
+            value: recipient
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to validate recipient");
+        }
+
+        const data = await res.json();
+        if (data.userId) {
+          setRecipientDetails(data);
+          setRecipientStatus(RecipientStatus.FOUND);
+          setError("");
+        } else {
+          setRecipientStatus(RecipientStatus.NOT_FOUND);
+          setRecipientDetails(null);
+          setError("User not found");
+        }
+      } catch (err) {
+        setRecipientStatus(RecipientStatus.ERROR);
+        setRecipientDetails(null);
+        setError("Failed to validate recipient");
+      }
+    };
+
+    const timeoutId = setTimeout(validateRecipient, 500);
+    return () => clearTimeout(timeoutId);
+  }, [recipient, identifierType]);
 
   function getInputClass() {
     return `w-full rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] text-base ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'} focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/40`;
@@ -24,71 +86,130 @@ export default function RequestMoneyForm({ onClose, onRequestSent }: Props) {
     e.preventDefault();
     setError("");
     setSuccess(false);
-    if (!recipient || !amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      setError("Please enter a valid recipient and amount.");
+
+    if (recipientStatus !== RecipientStatus.FOUND) {
+      setError("Please enter a valid recipient");
       return;
     }
+
+    if (recipientDetails.userId === currentUserId) {
+      setError("You cannot request money from yourself");
+      return;
+    }
+
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      setError("Please enter a valid amount");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          recipient,
-          identifierType,
+          recipient: recipientDetails.userId,
+          identifierType: "userId",
           amount: Number(amount),
           note,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send request");
+      
       setSuccess(true);
       setRecipient("");
       setAmount("");
       setNote("");
+      
+      // Show success toast
+      toast.success('Money request sent successfully!', {
+        position: "bottom-center",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        theme: "dark",
+      });
+      
+      // Trigger refresh of requests list
       if (onRequestSent) onRequestSent();
+      if (onSuccess) onSuccess();
+      
+      // Close the modal after a short delay
+      setTimeout(() => {
+        onClose();
+      }, 1500);
     } catch (err: any) {
       setError(err.message || "Failed to send request");
+      // Show error toast
+      toast.error(err.message || "Failed to send request", {
+        position: "bottom-center",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        theme: "dark",
+      });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className={`bg-white dark:bg-[#18192b] rounded-3xl p-8 w-full max-w-md shadow-2xl border border-white/10 relative glass-card`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-white dark:bg-[#18192b] rounded-xl shadow-lg p-6 w-full max-w-md relative">
         <button
-          type="button"
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
           onClick={onClose}
-          className="absolute top-5 right-5 text-2xl text-white/70 hover:text-white focus:outline-none"
           aria-label="Close"
-          style={{ zIndex: 2 }}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
-        <h3 className="text-3xl font-extrabold mb-6 text-[#7B61FF] tracking-tight text-center">Request Money</h3>
+        <h2 className="text-2xl font-bold mb-6">Request Money</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           <div>
             <label className="block text-base font-semibold mb-2">Recipient</label>
             <div className="flex gap-2">
-              <select value={identifierType} onChange={e => setIdentifierType(e.target.value)} className={`rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'}` }>
+              <select 
+                value={identifierType} 
+                onChange={e => {
+                  setIdentifierType(e.target.value);
+                  setRecipient("");
+                  setRecipientStatus(RecipientStatus.IDLE);
+                }} 
+                className={`rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-whistite/10' : 'text-[#111827] border-gray-200'}`}
+              >
                 <option value="username">Username</option>
-                <option value="userId">User ID</option>
+                <option value="userCode">User Code</option>
               </select>
               <input
                 type="text"
                 value={recipient}
                 onChange={e => setRecipient(e.target.value)}
-                placeholder={identifierType === "username" ? "Enter username" : "Enter user ID"}
-                className={getInputClass()}
+                placeholder={identifierType === "username" ? "Enter username" : "Enter user code"}
+                className={`${getInputClass()} ${recipientStatus === RecipientStatus.FOUND ? 'border-green-500' : recipientStatus === RecipientStatus.NOT_FOUND ? 'border-red-500' : ''}`}
                 required
               />
             </div>
+            {recipientStatus === RecipientStatus.SEARCHING && (
+              <div className="text-sm text-gray-500 mt-1">Validating recipient...</div>
+            )}
+            {recipientStatus === RecipientStatus.FOUND && recipientDetails && (
+              <div className="text-sm text-green-500 mt-1">
+                Found user: {recipientDetails.fullname} (@{recipientDetails.username})
+              </div>
+            )}
+            {recipientStatus === RecipientStatus.NOT_FOUND && (
+              <div className="text-sm text-red-500 mt-1">User not found</div>
+            )}
           </div>
           <div>
-            <label className="block text-base font-semibold mb-2">Amount</label>
+            <label className="block text-base font-semibold mb-2">Amount (USD)</label>
             <input
               type="number"
               value={amount}
@@ -114,7 +235,7 @@ export default function RequestMoneyForm({ onClose, onRequestSent }: Props) {
           <button
             type="submit"
             className="w-full bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white py-3 rounded-xl font-bold text-lg shadow-lg hover:from-[#6B51EF] hover:to-[#9771FA] transition-all focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/40 disabled:opacity-60"
-            disabled={loading}
+            disabled={loading || recipientStatus !== RecipientStatus.FOUND || !amount || isNaN(Number(amount)) || Number(amount) <= 0}
           >
             {loading ? "Sending..." : "Send Request"}
           </button>

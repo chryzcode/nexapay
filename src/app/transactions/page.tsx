@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
+import { useWallet } from "../../context/WalletContext";
 import { useTheme } from "@/app/providers/ThemeProvider";
 
 // Transaction type for type safety
@@ -16,10 +17,13 @@ interface Transaction {
   currency: string;
   network: number;
   txHash: string;
+  senderWallet?: string;
+  recipientWallet?: string;
 }
 
 export default function Transactions() {
   const { user, loading } = useAuth();
+  const { account } = useWallet();
   const router = useRouter();
   const { isDarkMode } = useTheme();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -34,21 +38,46 @@ export default function Transactions() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !account) return;
     fetch("/api/transactions")
       .then(res => res.json())
       .then(data => {
-        setTransactions(data.transactions || []);
-        setFiltered(data.transactions || []);
+        // Mark transactions as 'received' if the current wallet is the recipient
+        const processedTransactions = (data.transactions || []).map((tx: any) => {
+          if (tx.recipientWallet && account && tx.recipientWallet.toLowerCase() === account.toLowerCase()) {
+            return { ...tx, type: 'received' };
+          }
+          if (tx.senderWallet && account && tx.senderWallet.toLowerCase() === account.toLowerCase()) {
+            return { ...tx, type: 'sent' };
+          }
+          // fallback to old logic if wallet fields are missing
+          if (tx.recipient && account && tx.recipient.toLowerCase() === account.toLowerCase()) {
+            return { ...tx, type: 'received' };
+          }
+          if (tx.sender && account && tx.sender.toLowerCase() === account.toLowerCase()) {
+            return { ...tx, type: 'sent' };
+          }
+          return tx;
+        });
+        setTransactions(processedTransactions);
+        setFiltered(processedTransactions);
       });
-  }, [user]);
+  }, [user, account]);
 
   useEffect(() => {
     let txs = [...transactions];
-    if (typeFilter !== 'all') txs = txs.filter(tx => tx.type === typeFilter);
+    if (typeFilter !== 'all') {
+      if (typeFilter === 'sent') {
+        txs = txs.filter(tx => tx.type === 'sent' && tx.senderWallet && account && tx.senderWallet.toLowerCase() === account.toLowerCase());
+      } else if (typeFilter === 'received') {
+        txs = txs.filter(tx => tx.type === 'received' && tx.recipientWallet && account && tx.recipientWallet.toLowerCase() === account.toLowerCase());
+      } else {
+        txs = txs.filter(tx => tx.type === typeFilter);
+      }
+    }
     if (statusFilter !== 'all') txs = txs.filter(tx => tx.status === statusFilter);
     setFiltered(txs);
-  }, [typeFilter, statusFilter, transactions]);
+  }, [typeFilter, statusFilter, transactions, account]);
 
   if (loading) {
     return (
@@ -86,50 +115,50 @@ export default function Transactions() {
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 animate-pulse">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
             </svg>
-          </div>
         </div>
-        <div className="overflow-x-auto">
-          <div className={`bg-white/5 backdrop-blur-lg rounded-xl border border-white/10 overflow-hidden ${isDarkMode ? '' : 'bg-white border-gray-200 shadow-md'}`}
+      </div>
+      <div className="overflow-x-auto">
+        <div className={`bg-white/5 backdrop-blur-lg rounded-xl border border-white/10 overflow-hidden ${isDarkMode ? '' : 'bg-white border-gray-200 shadow-md'}`}
             style={{ minWidth: '800px' }}>
             <div className={`grid grid-cols-4 gap-6 text-gray-400 font-medium mb-8 px-8 py-6 ${isDarkMode ? 'text-[#F9F9FB]' : 'text-[#111827]'}`}> 
-              <div>Date</div>
-              <div>Description</div>
-              <div>Amount</div>
-              <div>Status</div>
-            </div>
-            {filtered.length === 0 ? (
-              <div className={`text-center py-16 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No transactions found</div>
-            ) : (
-              filtered.map((tx, idx) => (
+            <div>Date</div>
+            <div>Description</div>
+            <div>Amount</div>
+            <div>Status</div>
+          </div>
+          {filtered.length === 0 ? (
+            <div className={`text-center py-16 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No transactions found</div>
+          ) : (
+            filtered.map((tx, idx) => (
                 <div key={idx} className="space-y-2 py-4 border-b last:border-b-0 border-gray-100 dark:border-[#232946] px-8">
                   <div className="grid grid-cols-4 gap-6 items-center">
-                    <div>{new Date(tx.createdAt).toLocaleDateString()}</div>
-                    <div>{tx.type === 'sent' ? `To ${tx.recipient.slice(0, 6)}...${tx.recipient.slice(-4)}` : `From ${tx.sender.slice(0, 6)}...${tx.sender.slice(-4)}`}</div>
-                    <div className="font-semibold">
-                      {tx.type === 'sent' ? '-' : '+'}${tx.amount} {tx.currency}
-                    </div>
-                    <div className={`capitalize font-medium ${tx.status === 'completed' ? 'text-green-500' : tx.status === 'pending' ? 'text-yellow-500' : 'text-red-500'}`}>
-                      {tx.status}
-                    </div>
+                  <div>{new Date(tx.createdAt).toLocaleDateString()}</div>
+                  <div>{tx.type === 'sent' ? `To ${tx.recipient.slice(0, 6)}...${tx.recipient.slice(-4)}` : `From ${tx.sender.slice(0, 6)}...${tx.sender.slice(-4)}`}</div>
+                  <div className="font-semibold">
+                    {tx.type === 'sent' ? '-' : '+'}${tx.amount} {tx.currency}
                   </div>
-                  {tx.txHash && (
-                    <div className="mt-2 pl-2 border-l-2 border-[#7B61FF]/20">
-                      <a 
-                        href={`https://sepolia.etherscan.io/tx/${tx.txHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 text-sm text-[#7B61FF] hover:text-[#A78BFA] transition-colors"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                        </svg>
-                        View Transaction: {tx.txHash.slice(0, 8)}...{tx.txHash.slice(-6)}
-                      </a>
-                    </div>
-                  )}
+                  <div className={`capitalize font-medium ${tx.status === 'completed' ? 'text-green-500' : tx.status === 'pending' ? 'text-yellow-500' : 'text-red-500'}`}>
+                    {tx.status}
+                  </div>
                 </div>
-              ))
-            )}
+                {tx.txHash && (
+                  <div className="mt-2 pl-2 border-l-2 border-[#7B61FF]/20">
+                    <a 
+                      href={`https://sepolia.etherscan.io/tx/${tx.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm text-[#7B61FF] hover:text-[#A78BFA] transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      </svg>
+                      View Transaction: {tx.txHash.slice(0, 8)}...{tx.txHash.slice(-6)}
+                    </a>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
           </div>
         </div>
       </div>

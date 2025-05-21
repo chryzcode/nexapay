@@ -10,10 +10,29 @@ export default function Home() {
   const { isDarkMode } = useTheme();
 
   const supportedCryptocurrencies = [
-    { name: "Bitcoin", symbol: "BTC" },
     { name: "Ethereum", symbol: "ETH" },
     { name: "USDC", symbol: "USDC" },
     { name: "USDT", symbol: "USDT" },
+  ];
+
+  const supportedNetworks = [
+    { name: "Ethereum Mainnet", symbol: "ETH", id: 1 },
+    { name: "Polygon", symbol: "MATIC", id: 137 },
+    { name: "BSC", symbol: "BNB", id: 56 },
+    { name: "Avalanche", symbol: "AVAX", id: 43114 },
+    { name: "Sepolia (Testnet)", symbol: "ETH", id: 11155111 },
+    { name: "Mumbai (Testnet)", symbol: "MATIC", id: 80001 },
+    { name: "BSC Testnet", symbol: "BNB", id: 97 },
+  ];
+
+  const networkTokens = [
+    { network: "Ethereum Mainnet", tokens: ["ETH", "USDC", "USDT"] },
+    { network: "Polygon", tokens: ["MATIC", "USDC", "USDT"] },
+    { network: "BSC", tokens: ["BNB", "USDC", "USDT"] },
+    { network: "Avalanche", tokens: ["AVAX", "USDC", "USDT"] },
+    { network: "Sepolia (Testnet)", tokens: ["ETH", "USDC", "USDT"] },
+    { network: "Mumbai (Testnet)", tokens: ["MATIC", "USDC", "USDT"] },
+    { network: "BSC Testnet", tokens: ["BNB", "USDC", "USDT"] },
   ];
 
   return (
@@ -36,7 +55,7 @@ export default function Home() {
             Accept Crypto Payments <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] drop-shadow-sm">With <span className="text-purple-600">NexaPay</span></span>
           </h2>
           <p className={`mt-4 text-xl ${isDarkMode ? 'text-gray-300' : 'text-gray-800'} font-medium`}>
-            Effortlessly send and receive cryptocurrencies with speed and security. Experience seamless transactions for Bitcoin, Ethereum, and all major tokens.
+            Effortlessly send and receive cryptocurrencies with speed and security. Experience seamless transactions for Ethereum, and all major tokens.
           </p>
           
           <div className="mt-8 flex flex-wrap gap-4">
@@ -191,10 +210,10 @@ export default function Home() {
         <p className={`text-xl ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-8 max-w-2xl font-medium`}>Getting started with NexaPay is simple and straightforward</p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
-            { step: "1", title: "Connect Wallet", description: "Link your crypto wallet to get started with Bitcoin, Ethereum, and more." },
+            { step: "1", title: "Connect Wallet", description: "Link your crypto wallet to get started with Ethereum, and more." },
             { step: "2", title: "Send", description: "Initiate transactions to send cryptocurrencies to your people worldwide." },
-            { step: "3", title: "Monitor", description: "Track payment status in real-time for Bitcoin and Ethereum transactions." },
-            { step: "4", title: "Receive", description: "Get funds directly to your wallet in Bitcoin, Ethereum, or other supported currencies." }
+            { step: "3", title: "Monitor", description: "Track payment status in real-time for Ethereum transactions." },
+            { step: "4", title: "Receive", description: "Get funds directly to your wallet in Ethereum, or other supported currencies." }
           ].map((step, index) => (
             <motion.div 
               key={index}
@@ -344,6 +363,48 @@ export default function Home() {
           ))}
         </div>
       </motion.section>
+
+      {/* Supported Networks & Tokens Section */}
+      <section className="px-8 md:px-16 py-12">
+        <h2 className="text-2xl md:text-3xl font-bold mb-4">Supported Networks & Tokens</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-[600px] w-full border border-gray-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#18192b]">
+            <thead>
+              <tr>
+                <th className="p-3 text-left">Network</th>
+                <th className="p-3 text-left">Tokens</th>
+              </tr>
+            </thead>
+            <tbody>
+              {networkTokens.map((row, idx) => (
+                <tr key={row.network} className="border-t border-gray-100 dark:border-white/5">
+                  <td className="p-3 font-semibold">{row.network}</td>
+                  <td className="p-3 flex gap-2 flex-wrap">
+                    {row.tokens.map(token => (
+                      <span key={token} className="inline-block px-2 py-1 bg-[#7B61FF]/10 text-[#7B61FF] dark:bg-[#A78BFA]/10 dark:text-[#A78BFA] rounded-md text-xs font-medium">{token}</span>
+                    ))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Cross-chain Functionality Section */}
+      <section className="px-8 md:px-16 py-12">
+        <h2 className="text-2xl md:text-3xl font-bold mb-4">Cross-chain Payments</h2>
+        <p className="mb-4 text-lg text-gray-700 dark:text-gray-300 max-w-2xl">
+          NexaPay supports cross-chain payments using <span className="font-semibold text-[#7B61FF]">Stargate</span>, allowing you to send and receive crypto seamlessly across Ethereum, Polygon, BSC, Avalanche, and more. Enjoy true interoperability and low fees for your transactions.
+        </p>
+        <div className="flex flex-wrap gap-4 mt-4">
+          {supportedNetworks.map(net => (
+            <span key={net.id} className="inline-block px-4 py-2 bg-gradient-to-r from-[#7B61FF]/10 to-[#A78BFA]/10 text-[#7B61FF] dark:text-[#A78BFA] rounded-lg font-medium text-base shadow-sm">
+              {net.name}
+            </span>
+          ))}
+        </div>
+      </section>
 
       {/* CTA Section */}
       <motion.section

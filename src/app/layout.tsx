@@ -31,10 +31,9 @@ export default function RootLayout({
               <main className="min-h-screen bg-inherit relative my-10">
                 {children}
               </main>
-              {/* ToastContainer must be rendered here for all client-side toasts */}
               <ToastContainer
-                position="top-right"
-                autoClose={4000}
+                position="bottom-center"
+                autoClose={3000}
                 hideProgressBar={false}
                 newestOnTop={false}
                 closeOnClick
@@ -42,7 +41,7 @@ export default function RootLayout({
                 pauseOnFocusLoss
                 draggable
                 pauseOnHover
-                theme="colored"
+                theme="dark"
               />
             </WalletProvider>
           </ThemeProvider>

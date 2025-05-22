@@ -3,6 +3,7 @@ import { useTheme } from "../providers/ThemeProvider";
 import { toast } from "react-toastify";
 import { useAuth } from "@/context/AuthContext";
 import { useWallet } from "@/context/WalletContext";
+import Web3 from "web3";
 
 interface Props {
   onClose: () => void;
@@ -32,6 +33,7 @@ export default function RequestMoneyForm({ onClose, onRequestSent, onSuccess, cu
   const [success, setSuccess] = useState(false);
   const [recipientStatus, setRecipientStatus] = useState<RecipientStatus>(RecipientStatus.IDLE);
   const [recipientDetails, setRecipientDetails] = useState<any>(null);
+  const [isNetworkCompatible, setIsNetworkCompatible] = useState<boolean>(false);
 
   // Debounce recipient validation
   useEffect(() => {
@@ -78,6 +80,32 @@ export default function RequestMoneyForm({ onClose, onRequestSent, onSuccess, cu
     return () => clearTimeout(timeoutId);
   }, [recipient, identifierType]);
 
+  // Add network compatibility check
+  useEffect(() => {
+    const checkNetworkCompatibility = async () => {
+      if (!window.ethereum || !recipientDetails?.metadata?.networkHint) {
+        setIsNetworkCompatible(false);
+        return;
+      }
+
+      try {
+        const web3 = new Web3(window.ethereum);
+        const chainId = Number(await web3.eth.getChainId());
+        const isSenderTestnet = chainId === 11155111; // Sepolia testnet
+        const recipientNetworkHint = recipientDetails.metadata.networkHint;
+        const isRecipientTestnet = recipientNetworkHint === 11155111;
+        
+        // Prevent testnet to mainnet or mainnet to testnet
+        setIsNetworkCompatible(!(isSenderTestnet !== isRecipientTestnet));
+      } catch (error) {
+        console.error('Error checking network compatibility:', error);
+        setIsNetworkCompatible(false);
+      }
+    };
+
+    checkNetworkCompatibility();
+  }, [recipientDetails?.metadata?.networkHint]);
+
   function getInputClass() {
     return `w-full rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] text-base ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'} focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/40`;
   }
@@ -89,6 +117,11 @@ export default function RequestMoneyForm({ onClose, onRequestSent, onSuccess, cu
 
     if (recipientStatus !== RecipientStatus.FOUND) {
       setError("Please enter a valid recipient");
+      return;
+    }
+
+    if (!isNetworkCompatible) {
+      setError("Cannot request between testnet and mainnet");
       return;
     }
 
@@ -182,7 +215,7 @@ export default function RequestMoneyForm({ onClose, onRequestSent, onSuccess, cu
                   setRecipient("");
                   setRecipientStatus(RecipientStatus.IDLE);
                 }} 
-                className={`rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-whistite/10' : 'text-[#111827] border-gray-200'}`}
+                className={`rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'}`}
               >
                 <option value="username">Username</option>
                 <option value="userCode">User Code</option>
@@ -202,10 +235,20 @@ export default function RequestMoneyForm({ onClose, onRequestSent, onSuccess, cu
             {recipientStatus === RecipientStatus.FOUND && recipientDetails && (
               <div className="text-sm text-green-500 mt-1">
                 Found user: {recipientDetails.fullname} (@{recipientDetails.username})
+                {recipientDetails.metadata?.networkHint && (
+                  <span className="ml-2">
+                    ({recipientDetails.metadata.networkHint === 11155111 ? 'Testnet' : 'Mainnet'})
+                  </span>
+                )}
               </div>
             )}
             {recipientStatus === RecipientStatus.NOT_FOUND && (
               <div className="text-sm text-red-500 mt-1">User not found</div>
+            )}
+            {!isNetworkCompatible && recipientStatus === RecipientStatus.FOUND && (
+              <div className="text-sm text-red-500 mt-1">
+                Cannot request between testnet and mainnet
+              </div>
             )}
           </div>
           <div>
@@ -235,7 +278,7 @@ export default function RequestMoneyForm({ onClose, onRequestSent, onSuccess, cu
           <button
             type="submit"
             className="w-full bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white py-3 rounded-xl font-bold text-lg shadow-lg hover:from-[#6B51EF] hover:to-[#9771FA] transition-all focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/40 disabled:opacity-60"
-            disabled={loading || recipientStatus !== RecipientStatus.FOUND || !amount || isNaN(Number(amount)) || Number(amount) <= 0}
+            disabled={loading || recipientStatus !== RecipientStatus.FOUND || !amount || isNaN(Number(amount)) || Number(amount) <= 0 || !isNetworkCompatible}
           >
             {loading ? "Sending..." : "Send Request"}
           </button>

@@ -5,6 +5,7 @@ import Web3 from 'web3';
 import BN from 'bn.js';
 import { ethers } from "ethers";
 import { stargateSwap, LZ_CHAIN_IDS, STARGATE_ROUTER_ADDRESSES } from "./stargate";
+import { useWallet } from "@/context/WalletContext";
 
 // NexaPayPayment contract ABI
 const NEXAPAY_ABI = [
@@ -69,6 +70,7 @@ export default function RequestsDashboard({ currentUserId }: Props) {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [requestToReject, setRequestToReject] = useState<string | null>(null);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+  const { account } = useWallet();
 
   const fetchRequests = async () => {
     setLoading(true);
@@ -110,52 +112,58 @@ export default function RequestsDashboard({ currentUserId }: Props) {
   }, []);
 
   const handleAccept = async (request: RequestItem) => {
+    if (!window.ethereum) {
+      toast.error("Please install MetaMask to accept requests");
+      return;
+    }
+
+    if (!account) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
+    setProcessingRequestId(request._id);
     try {
-      setProcessingRequestId(request._id);
-
-      if (!NEXAPAY_CONTRACT_ADDRESS) {
-        throw new Error('Contract address not configured');
-      }
-
-      // 1. Get the authenticated user's wallet (payer)
-      if (!window.ethereum) {
-        throw new Error('Please install MetaMask to make payments');
-      }
-
+      // 1. Get current network
       const web3 = new Web3(window.ethereum);
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const chainId = Number(await web3.eth.getChainId());
+      const isTestnet = chainId === 11155111; // Sepolia testnet
+
+      // Get payer address (connected wallet)
+      const accounts = await web3.eth.getAccounts();
       const payerAddress = accounts[0];
 
-      // 2. Get the requester's wallet address (recipient)
-      let recipientAddress = request.sender?.walletAddress;
-      if (!recipientAddress) {
-        const senderRes = await fetch(`/api/wallet/connect?userId=${request.senderId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          cache: 'no-store'
-        });
+      // Define provider for Stargate
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
 
-        if (!senderRes.ok) {
-          const errorData = await senderRes.json();
-          throw new Error(errorData.error || 'Failed to get sender wallet address');
+      // Define checksummed recipient address
+      const checksummedRecipient = web3.utils.toChecksumAddress(request.sender?.walletAddress || "");
+
+      // 2. Get recipient's network from their wallet address
+      const recipientRes = await fetch('/api/resolve-identifier', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'address',
+          value: request.sender?.walletAddress
+        })
+      });
+
+      if (!recipientRes.ok) {
+        throw new Error('Failed to resolve recipient network');
+      }
+
+      const recipientData = await recipientRes.json();
+      const recipientNetworkHint = recipientData.metadata?.networkHint;
+      
+      if (recipientNetworkHint) {
+        const isRecipientTestnet = recipientNetworkHint === 11155111;
+        if (isTestnet !== isRecipientTestnet) {
+          throw new Error(`Network mismatch: You are on ${isTestnet ? 'testnet' : 'mainnet'} but requester is on ${isRecipientTestnet ? 'testnet' : 'mainnet'}`);
         }
-
-        const data = await senderRes.json();
-        recipientAddress = data.walletAddress;
       }
-
-      if (!recipientAddress) {
-        throw new Error('Sender has not connected their wallet');
-      }
-
-      // Validate recipient address
-      if (!web3.utils.isAddress(recipientAddress)) {
-        throw new Error(`Invalid recipient address format: ${recipientAddress}`);
-      }
-      const checksummedRecipient = web3.utils.toChecksumAddress(recipientAddress);
 
       // 3. Get current ETH price in USD
       const ethPriceResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');

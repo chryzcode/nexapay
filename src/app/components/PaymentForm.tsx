@@ -133,15 +133,13 @@ const NEXAPAY_CONTRACT_ADDR = process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT;
 enum IdentifierType {
   WALLET = 'wallet',
   USERNAME = 'username',
-  USER_ID = 'userId',
-  EMAIL = 'email'
+  USER_ID = 'userId'
 }
 
 const IDENTIFIER_TYPES_LIST = [
   { label: "Wallet Address", value: IdentifierType.WALLET, placeholder: "0x..." },
   { label: "Username", value: IdentifierType.USERNAME, placeholder: "username" },
   { label: "User ID", value: IdentifierType.USER_ID, placeholder: "123456" },
-  { label: "Email", value: IdentifierType.EMAIL, placeholder: "email@example.com" },
 ] as const;
 
 enum RecipientStatus {
@@ -201,8 +199,49 @@ export default function PaymentForm({
   // Add these state variables near the top of the component
   const [ethAmount, setEthAmount] = useState<number | null>(null);
   const [ethPrice, setEthPrice] = useState<number | null>(null);
+  const [priceError, setPriceError] = useState<string | null>(null);
 
   const [requestId, setRequestId] = useState<string | null>(null);
+
+  const [isNetworkCompatible, setIsNetworkCompatible] = useState<boolean>(false);
+
+  // Add state for network error message
+  const [networkErrorMessage, setNetworkErrorMessage] = useState<string>("");
+
+  // Add state for recipient's network type
+  const [recipientNetworkType, setRecipientNetworkType] = useState<string>("");
+
+  // Add a fallback price fetch function
+  const fetchEthPriceWithFallback = async () => {
+    try {
+      // Try CoinGecko first
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+      if (!response.ok) {
+        throw new Error('CoinGecko API failed');
+      }
+      const data = await response.json();
+      setEthPrice(data.ethereum.usd);
+      setPriceError(null);
+    } catch (error) {
+      console.warn('CoinGecko API failed, trying fallback...');
+      try {
+        // Fallback to 1inch API
+        const response = await fetch('https://api.1inch.io/v5.0/1/quote?fromTokenAddress=0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee&toTokenAddress=0xdac17f958d2ee523a2206206994597c13d831ec7&amount=1000000000000000000');
+        if (!response.ok) {
+          throw new Error('Fallback API failed');
+        }
+        const data = await response.json();
+        const price = parseFloat(data.toTokenAmount) / 1e6; // Convert from USDT decimals
+        setEthPrice(price);
+        setPriceError(null);
+      } catch (fallbackError) {
+        console.error('All price APIs failed:', fallbackError);
+        setPriceError('Unable to fetch current ETH price. Please try again later.');
+        // Set a default price for development/testing
+        setEthPrice(2000); // Default fallback price
+      }
+    }
+  };
 
   // Listen for payment modal open event
   useEffect(() => {
@@ -250,18 +289,16 @@ export default function PaymentForm({
     fetchAddress();
   }, []);
 
-  // Fetch token USD rate on token change
+  // Update the useEffect for price fetching
   useEffect(() => {
     async function fetchRate() {
       setUsdRate(null);
       setEthPrice(null);
+      setPriceError(null);
+      
       try {
-        // Get current ETH price in USD
-        const ethPriceResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
-        const ethPriceData = await ethPriceResponse.json();
-        const currentEthPrice = ethPriceData.ethereum.usd;
-        setEthPrice(currentEthPrice);
-
+        await fetchEthPriceWithFallback();
+        
         // Detect current network's token
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const network = await provider.getNetwork();
@@ -281,18 +318,22 @@ export default function PaymentForm({
         if (tokenInfo.symbol.toLowerCase().includes('usdt')) coingeckoId = 'tether';
         else if (tokenInfo.symbol.toLowerCase().includes('usdc')) coingeckoId = 'usd-coin';
         else coingeckoId = 'usd-coin'; // fallback
+        
         try {
           const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoId}&vs_currencies=usd`);
+          if (!res.ok) {
+            throw new Error('Failed to fetch USD rate');
+          }
           const data = await res.json();
           const rate = data[coingeckoId].usd;
           setUsdRate(rate);
         } catch (err) {
-          toast.error("Failed to fetch USD rate");
-          setUsdRate(null);
+          console.warn('Failed to fetch USD rate:', err);
+          setUsdRate(1); // Fallback to 1:1 rate
         }
       } catch (err) {
-        toast.error("Network detection failed");
-        setUsdRate(null);
+        console.error('Network detection failed:', err);
+        setUsdRate(1); // Fallback to 1:1 rate
       }
     }
     fetchRate();
@@ -373,6 +414,85 @@ export default function PaymentForm({
     fetchUserId();
   }, [onClose]);
 
+  // Update network compatibility check to also set recipient's network type
+  useEffect(() => {
+    const checkNetworkCompatibility = async () => {
+      if (!window.ethereum || !recipientResolution?.address) {
+        setIsNetworkCompatible(false);
+        setNetworkErrorMessage("");
+        setRecipientNetworkType("");
+        return;
+      }
+
+      try {
+        const web3 = new Web3(window.ethereum);
+        const chainId = Number(await web3.eth.getChainId());
+        
+        // Define testnet chain IDs
+        const TESTNET_CHAINS = [11155111, 80001, 97]; // Sepolia, Mumbai, BSC Testnet
+        const isSenderTestnet = TESTNET_CHAINS.includes(chainId);
+
+        // Check recipient's network by looking up their address on both networks
+        let isRecipientTestnet = false;
+        try {
+          // Try to get balance on testnet
+          const testnetWeb3 = new Web3('https://sepolia.infura.io/v3/your-infura-key');
+          const balance = await testnetWeb3.eth.getBalance(recipientResolution.address);
+          isRecipientTestnet = BigInt(balance) > BigInt(0);
+        } catch (error) {
+          console.log('Recipient not found on testnet');
+        }
+
+        // If not found on testnet, check mainnet
+        if (!isRecipientTestnet) {
+          try {
+            const mainnetWeb3 = new Web3('https://mainnet.infura.io/v3/your-infura-key');
+            const balance = await mainnetWeb3.eth.getBalance(recipientResolution.address);
+            isRecipientTestnet = false;
+          } catch (error) {
+            console.log('Recipient not found on mainnet');
+          }
+        }
+        
+        // Set recipient's network type
+        setRecipientNetworkType(isRecipientTestnet ? "Sepolia (Testnet)" : "Ethereum (Mainnet)");
+        
+        // Allow if both are on testnet or both are on mainnet
+        const isCompatible = isSenderTestnet === isRecipientTestnet;
+        setIsNetworkCompatible(isCompatible);
+
+        // Set appropriate error message
+        if (!isCompatible) {
+          if (isSenderTestnet && !isRecipientTestnet) {
+            setNetworkErrorMessage("Cannot send from testnet to mainnet");
+          } else if (!isSenderTestnet && isRecipientTestnet) {
+            setNetworkErrorMessage("Cannot send from mainnet to testnet");
+          } else {
+            setNetworkErrorMessage("Network mismatch");
+          }
+        } else {
+          setNetworkErrorMessage("");
+        }
+
+        // Log for debugging
+        console.log('Network Check:', {
+          senderChainId: chainId,
+          recipientAddress: recipientResolution.address,
+          isSenderTestnet,
+          isRecipientTestnet,
+          isCompatible
+        });
+      } catch (error) {
+        console.error('Error checking network compatibility:', error);
+        setIsNetworkCompatible(false);
+        setNetworkErrorMessage("Network validation failed");
+        setRecipientNetworkType("");
+      }
+    };
+
+    checkNetworkCompatibility();
+  }, [recipientResolution?.address]);
+
   // Send payment
   const handleSend = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -414,6 +534,17 @@ export default function PaymentForm({
       
       if (!networkStablecoins) {
         throw new Error(`Network ${chainId} not supported`);
+      }
+
+      // Validate network compatibility
+      const isTestnet = chainId === 11155111; // Sepolia testnet
+      const recipientNetworkHint = recipientResolution.metadata?.networkHint;
+      
+      if (recipientNetworkHint) {
+        const isRecipientTestnet = recipientNetworkHint === 11155111;
+        if (isTestnet !== isRecipientTestnet) {
+          throw new Error(`Network mismatch: You are on ${isTestnet ? 'testnet' : 'mainnet'} but recipient is on ${isRecipientTestnet ? 'testnet' : 'mainnet'}`);
+        }
       }
 
       // Get current ETH price in USD
@@ -586,97 +717,108 @@ export default function PaymentForm({
         </button>
         <h2 className="text-2xl font-bold mb-6">Send Payment</h2>
         <form onSubmit={handleSend} className="flex flex-col gap-6">
-          <div>
-            <label className="block text-base font-semibold mb-2">Recipient</label>
-            <div className="flex gap-2">
-              <select 
-                value={identifierType} 
-                onChange={e => {
-                  setIdentifierType(e.target.value as IdentifierType);
-                  setRecipientInput("");
-                  setRecipientStatus(RecipientStatus.IDLE);
-                }} 
-                className={`rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'}`}
-              >
-                {IDENTIFIER_TYPES_LIST.map(type => (
-                  <option value={type.value} key={type.value}>{type.label}</option>
-                ))}
-              </select>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-base font-semibold mb-2">Recipient</label>
+              <div className="flex gap-2">
+                <select 
+                  value={identifierType} 
+                  onChange={e => {
+                    setIdentifierType(e.target.value as IdentifierType);
+                    setRecipientInput("");
+                    setRecipientStatus(RecipientStatus.IDLE);
+                  }} 
+                  className={`w-1/3 rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'}`}
+                >
+                  {IDENTIFIER_TYPES_LIST.map(type => (
+                    <option value={type.value} key={type.value}>{type.label}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={recipientInput}
+                  onChange={(e) => {
+                    const input = e.target.value;
+                    setRecipientInput(input);
+                    setRecipientStatus(RecipientStatus.SEARCHING);
+                    setRecipientResolution(null);
+                  }}
+                  placeholder={identifierType === IdentifierType.USERNAME ? "Enter username" : identifierType === IdentifierType.USER_ID ? "Enter user code" : "Enter wallet address, username, or ENS"}
+                  className={`w-2/3 rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'} ${recipientStatus === RecipientStatus.FOUND ? 'border-green-500' : recipientStatus === RecipientStatus.NOT_FOUND ? 'border-red-500' : ''}`}
+                  required
+                />
+              </div>
+              {recipientStatus === RecipientStatus.SEARCHING && (
+                <div className="text-sm text-gray-500 mt-1">Validating recipient...</div>
+              )}
+              {recipientStatus === RecipientStatus.FOUND && recipientResolution?.type != null && recipientResolution?.address != null && (
+                <div className="text-sm text-green-500 mt-1">
+                  Found user: {String(recipientResolution.type ?? '')}: {String(recipientResolution.address ?? '')}
+                  {recipientResolution.metadata && typeof recipientResolution.metadata.networkHint === 'number'
+                    ? ` (${getNetworkName(recipientResolution.metadata.networkHint)})`
+                    : ''}
+                </div>
+              )}
+              {recipientStatus === RecipientStatus.NOT_FOUND && (
+                <div className="text-sm text-red-500 mt-1">User not found</div>
+              )}
+              {!isNetworkCompatible && recipientStatus === RecipientStatus.FOUND && networkErrorMessage && (
+                <div className="text-sm text-red-500 mt-1">
+                  {networkErrorMessage}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-base font-semibold mb-2">Amount</label>
               <input
-                type="text"
-                value={recipientInput}
-                onChange={(e) => {
-                  const input = e.target.value;
-                  setRecipientInput(input);
-                  setRecipientStatus(RecipientStatus.SEARCHING);
-                  setRecipientResolution(null);
-                }}
-                placeholder={identifierType === IdentifierType.USERNAME ? "Enter username" : identifierType === IdentifierType.USER_ID ? "Enter user code" : "Enter wallet address, username, or ENS"}
-                className={`${recipientStatus === RecipientStatus.FOUND ? 'border-green-500' : recipientStatus === RecipientStatus.NOT_FOUND ? 'border-red-500' : ''}`}
+                type="number"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                min="0.01"
+                step="0.01"
+                className={`w-full rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'}`}
                 required
               />
             </div>
-            {recipientStatus === RecipientStatus.SEARCHING && (
-              <div className="text-sm text-gray-500 mt-1">Validating recipient...</div>
-            )}
-            {recipientStatus === RecipientStatus.FOUND && recipientResolution?.type != null && recipientResolution?.address != null && (
-              <div className="text-sm text-green-500 mt-1">
-                Found user: {String(recipientResolution.type ?? '')}: {String(recipientResolution.address ?? '')}
-                {recipientResolution.metadata && typeof recipientResolution.metadata.networkHint === 'number'
-                  ? ` (${getNetworkName(recipientResolution.metadata.networkHint)})`
-                  : ''}
+
+            <div>
+              <label className="block text-base font-semibold mb-2">Reference <span className="text-gray-400 text-xs">(optional)</span></label>
+              <input
+                type="text"
+                value={reference}
+                onChange={e => setReference(e.target.value)}
+                className={`w-full rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'}`}
+                placeholder="Order ID, Invoice, etc."
+              />
+            </div>
+
+            <div className="text-center text-base font-semibold mb-2">
+              {getChainName(srcChainId)} <span className="mx-2">→</span> {recipientInput && recipientResolution?.address ? recipientNetworkType : ''}
+            </div>
+
+            {usdValue && (
+              <div className="text-sm text-gray-500">
+                <span className="font-medium">Amount in ETH:</span> {ethAmount ? `${ethAmount.toFixed(6)} ETH` : 'Calculating...'}
               </div>
             )}
-            {recipientStatus === RecipientStatus.NOT_FOUND && (
-              <div className="text-sm text-red-500 mt-1">User not found</div>
+            {ethPrice && (
+              <div className="text-sm text-gray-500">
+                <span className="font-medium">Current ETH Price:</span> ${ethPrice.toFixed(2)}
+                {priceError && <span className="text-red-500 ml-2">({priceError})</span>}
+              </div>
+            )}
+            {usdValue && (
+              <div className="text-xs text-blue-400">
+                ≈ {usdValue} USD
+              </div>
             )}
           </div>
-          <div>
-            <label className="block text-base font-semibold mb-2">Amount</label>
-            <input
-              type="number"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              min="0.01"
-              step="0.01"
-              className={`rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'}`}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-base font-semibold mb-2">Reference <span className="text-gray-400 text-xs">(optional)</span></label>
-            <input
-              type="text"
-              value={reference}
-              onChange={e => setReference(e.target.value)}
-              className={`rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'}`}
-              placeholder="Order ID, Invoice, etc."
-            />
-          </div>
-          {/* Show sender chain always, recipient chain only if resolved */}
-          <div className="text-center text-base font-semibold mb-2">
-            {getChainName(srcChainId)} <span className="mx-2">→</span> {recipientInput && recipientResolution?.address ? getChainName(dstChainId) : ''}
-          </div>
-          {/* Show USD value and ETH amount */}
-          {usdValue && (
-            <div className="text-sm text-gray-500">
-              <span className="font-medium">Amount in ETH:</span> {ethAmount ? `${ethAmount.toFixed(6)} ETH` : 'Calculating...'}
-            </div>
-          )}
-          {ethPrice && (
-            <div className="text-sm text-gray-500">
-              <span className="font-medium">Current ETH Price:</span> ${ethPrice.toFixed(2)}
-            </div>
-          )}
-          {usdValue && (
-            <div className="text-xs text-blue-400">
-              ≈ {usdValue} USD
-            </div>
-          )}
+
           <button
             type="submit"
             className="w-full bg-gradient-to-r from-[#7B61FF] to-[#A78BFA] text-white py-3 rounded-xl font-bold text-lg shadow-lg hover:from-[#6B51EF] hover:to-[#9771FA] transition-all focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/40 disabled:opacity-60"
-            disabled={sending || recipientStatus !== RecipientStatus.FOUND || !amount || isNaN(Number(amount)) || Number(amount) <= 0}
+            disabled={sending || recipientStatus !== RecipientStatus.FOUND || !amount || isNaN(Number(amount)) || Number(amount) <= 0 || !isNetworkCompatible}
           >
             {sending ? "Sending..." : "Send Payment"}
           </button>

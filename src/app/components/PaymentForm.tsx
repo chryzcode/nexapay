@@ -372,10 +372,15 @@ export default function PaymentForm({
       try {
         // Pass provider and identifierType to resolveRecipient
         const provider = new ethers.providers.Web3Provider(window.ethereum);
-        const resolvedRecipient = await resolveRecipient(recipientInput, provider);
+        // Convert IdentifierType to the format expected by resolveRecipient
+        const resolveType = identifierType === IdentifierType.USER_ID ? 'userCode' : 
+                           identifierType === IdentifierType.USERNAME ? 'username' : 
+                           identifierType === IdentifierType.WALLET ? 'wallet' : 'wallet';
+        const resolvedRecipient = await resolveRecipient(recipientInput, provider, resolveType);
         setRecipientResolution({
           address: resolvedRecipient.address,
           type: resolvedRecipient.type as IdentifierType,
+          metadata: resolvedRecipient.metadata
         });
         setRecipientStatus(RecipientStatus.FOUND);
       } catch (err) {
@@ -414,17 +419,18 @@ export default function PaymentForm({
     fetchUserId();
   }, [onClose]);
 
-  // Update network compatibility check to also set recipient's network type
+  // Check network compatibility
   useEffect(() => {
     const checkNetworkCompatibility = async () => {
-      if (!window.ethereum || !recipientResolution?.address) {
-        setIsNetworkCompatible(false);
+      if (!recipientResolution?.address) {
+        setIsNetworkCompatible(true);
         setNetworkErrorMessage("");
         setRecipientNetworkType("");
         return;
       }
 
       try {
+        // Get current network
         const web3 = new Web3(window.ethereum);
         const chainId = Number(await web3.eth.getChainId());
         
@@ -432,26 +438,15 @@ export default function PaymentForm({
         const TESTNET_CHAINS = [11155111, 80001, 97]; // Sepolia, Mumbai, BSC Testnet
         const isSenderTestnet = TESTNET_CHAINS.includes(chainId);
 
-        // Check recipient's network by looking up their address on both networks
+        // Use networkHint from resolved user instead of checking balances
+        const recipientNetworkHint = recipientResolution.metadata?.networkHint;
         let isRecipientTestnet = false;
-        try {
-          // Try to get balance on testnet
-          const testnetWeb3 = new Web3('https://sepolia.infura.io/v3/your-infura-key');
-          const balance = await testnetWeb3.eth.getBalance(recipientResolution.address);
-          isRecipientTestnet = BigInt(balance) > BigInt(0);
-        } catch (error) {
-          console.log('Recipient not found on testnet');
-        }
-
-        // If not found on testnet, check mainnet
-        if (!isRecipientTestnet) {
-          try {
-            const mainnetWeb3 = new Web3('https://mainnet.infura.io/v3/your-infura-key');
-            const balance = await mainnetWeb3.eth.getBalance(recipientResolution.address);
-            isRecipientTestnet = false;
-          } catch (error) {
-            console.log('Recipient not found on mainnet');
-          }
+        
+        if (recipientNetworkHint) {
+          isRecipientTestnet = recipientNetworkHint === 11155111; // Sepolia testnet
+        } else {
+          // Fallback: assume testnet if no networkHint (for backward compatibility)
+          isRecipientTestnet = true;
         }
         
         // Set recipient's network type
@@ -478,6 +473,7 @@ export default function PaymentForm({
         console.log('Network Check:', {
           senderChainId: chainId,
           recipientAddress: recipientResolution.address,
+          recipientNetworkHint,
           isSenderTestnet,
           isRecipientTestnet,
           isCompatible
@@ -491,7 +487,7 @@ export default function PaymentForm({
     };
 
     checkNetworkCompatibility();
-  }, [recipientResolution?.address]);
+  }, [recipientResolution?.address, recipientResolution?.metadata?.networkHint]);
 
   // Send payment
   const handleSend = useCallback(async (e: React.FormEvent) => {

@@ -75,7 +75,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
       const connectedAccount = accounts[0];
 
-      // Update user document in the database with the wallet address
+      // Get the current chainId
+      const chainId = await window.ethereum.request({ method: "eth_chainId" });
+      const networkHint = parseInt(chainId, 16); // Convert hex to decimal
+
+      // Update user document in the database with the wallet address and network
       const response = await fetch("/api/wallet/connect", {
         method: "POST",
         headers: {
@@ -84,6 +88,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({
           userId: user.id,
           walletAddress: connectedAccount,
+          networkHint: networkHint,
         }),
       });
 

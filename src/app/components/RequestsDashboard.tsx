@@ -79,8 +79,6 @@ export default function RequestsDashboard({ currentUserId }: Props) {
       const res = await fetch("/api/requests");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch requests");
-      console.log('Fetched requests:', data.requests);
-      console.log('Current user ID:', currentUserId);
       setRequests(data.requests || []);
     } catch (err: any) {
       setError(err.message || "Failed to fetch requests");
@@ -395,19 +393,10 @@ export default function RequestsDashboard({ currentUserId }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {requests.map(req => {
+                {requests.map((req, index) => {
                   const isProcessing = processingRequestId === req._id;
-                  console.log('Request details:', {
-                    requestId: req._id,
-                    recipientIdentifier: req.recipientIdentifier,
-                    recipient: req.recipient,
-                    currentUserId,
-                    isRecipient: req.recipientIdentifier === currentUserId,
-                    isRecipientByCode: req.recipient?.userCode === currentUserId,
-                    isRecipientByUsername: req.recipient?.username === currentUserId
-                  });
                   return (
-                    <tr key={req._id} className="border-b border-white/10 last:border-b-0">
+                    <tr key={`${req._id}-${index}`} className="border-b border-white/10 last:border-b-0">
                       <td className="p-3 whitespace-nowrap">
                         <span className="font-semibold text-[#7B61FF]">{req.sender?.username || req.senderId}</span>
                         <span className="ml-2 text-xs text-gray-400">({req.sender?.userCode || ''})</span>

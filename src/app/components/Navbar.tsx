@@ -73,7 +73,7 @@ export default function Navbar() {
       <nav className="hidden md:flex items-center gap-1">
         {navLinks.filter((link) => link.href !== "/dashboard" && link.href !== "/transactions").map((link, idx) => (
           <Link 
-            key={link.href || link.label || idx}
+            key={link.id || link.href || `nav-${idx}`}
             href={link.href}
             className="px-4 py-2 rounded-lg transition-colors font-medium"
           >

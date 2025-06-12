@@ -334,8 +334,8 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
-                  {transactions.slice(0, 3).map((tx: any) => (
-                    <div key={tx._id || tx.txHash} className="flex items-center justify-between p-3 rounded-lg bg-white/5 dark:bg-[#232946]/20 border border-white/10 min-h-[60px]">
+                  {transactions.slice(0, 3).map((tx: any, index: number) => (
+                    <div key={`${tx._id || tx.txHash}-${index}`} className="flex items-center justify-between p-3 rounded-lg bg-white/5 dark:bg-[#232946]/20 border border-white/10 min-h-[60px]">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${tx.type === 'sent' ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-500'}`}>
                           {tx.type === 'sent' ? <FaArrowUp className="w-4 h-4" /> : <FaArrowDown className="w-4 h-4" />}

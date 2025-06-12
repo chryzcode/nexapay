@@ -1,13 +1,14 @@
 import { ethers } from 'ethers';
 
 // Types for user resolution
-export type RecipientType = 'wallet' | 'username' | 'ens' | 'email';
+export type RecipientType = 'wallet' | 'username' | 'ens' | 'email' | 'userCode';
 export type RecipientResolutionResult = {
   address: string;
   type: RecipientType;
   metadata?: {
     username?: string;
     email?: string;
+    userCode?: string;
     networkHint?: number | undefined;
   };
 };
@@ -25,31 +26,122 @@ export function getNetworkName(networkHint?: number): string {
   return NETWORK_NAMES[networkHint] || `Unknown Network (${networkHint})`;
 };
 
-export const detectRecipientNetwork = (address: string): number | undefined => {
-  const networkHints: {[key: string]: number} = {
-    // Testnet Networks
-    '0x': 11155111,    // Sepolia (default Ethereum testnet)
-    '0x1': 11155111,   // Sepolia
-    '0x13881': 80001,  // Mumbai (Polygon testnet)
-    '0x38': 97,        // BSC Testnet
-    '0x61': 97,        // BSC Testnet
-  };
-
-  for (const [prefix, chainId] of Object.entries(networkHints)) {
-    if (address.toLowerCase().startsWith(prefix)) return chainId;
-  }
-
-  return undefined;
-};
-
 // Comprehensive recipient resolution
 export const resolveRecipient = async (
   input: string, 
-  provider?: ethers.providers.Web3Provider
+  provider?: ethers.providers.Web3Provider,
+  identifierType?: 'wallet' | 'username' | 'userCode' | 'email'
 ): Promise<RecipientResolutionResult> => {
   // Trim and normalize input
   input = input.trim().toLowerCase();
 
+  // If identifierType is provided, use it to determine resolution method
+  if (identifierType) {
+    switch (identifierType) {
+      case 'wallet':
+        // For wallet addresses, just validate the format
+        if (validateRecipient(input)) {
+          const checksumAddress = ethers.utils.getAddress(input);
+          return {
+            address: checksumAddress,
+            type: 'wallet',
+            metadata: {
+              networkHint: 11155111 // Default to Sepolia testnet for direct address input
+            }
+          };
+        }
+        throw new Error('Invalid wallet address format');
+
+      case 'username':
+        // For usernames, check if user exists on platform
+        try {
+          const response = await fetch(`/api/resolve-identifier`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              type: 'username',
+              value: input
+            })
+          });
+
+          if (!response.ok) throw new Error('User not found');
+
+          const userData = await response.json();
+          
+          return {
+            address: userData.address,
+            type: 'username',
+            metadata: {
+              username: input,
+              networkHint: userData.metadata?.networkHint
+            }
+          };
+        } catch (err) {
+          console.warn('Username resolution failed:', err);
+          throw new Error('Username not found on platform');
+        }
+
+      case 'userCode':
+        // For userCode, check if user exists on platform
+        try {
+          const response = await fetch(`/api/resolve-identifier`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              type: 'userCode',
+              value: input
+            })
+          });
+
+          if (!response.ok) throw new Error('User not found');
+
+          const userData = await response.json();
+          
+          return {
+            address: userData.address,
+            type: 'userCode',
+            metadata: {
+              userCode: input,
+              networkHint: userData.metadata?.networkHint
+            }
+          };
+        } catch (err) {
+          console.warn('UserCode resolution failed:', err);
+          throw new Error('UserCode not found on platform');
+        }
+
+      case 'email':
+        // For email, check if user exists on platform
+        try {
+          const response = await fetch(`/api/resolve-identifier`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              type: 'email',
+              value: input
+            })
+          });
+
+          if (!response.ok) throw new Error('User not found');
+
+          const userData = await response.json();
+          
+          return {
+            address: userData.address,
+            type: 'email',
+            metadata: {
+              email: input,
+              networkHint: userData.metadata?.networkHint
+            }
+          };
+        } catch (err) {
+          console.warn('Email resolution failed:', err);
+          throw new Error('Email not found on platform');
+        }
+    }
+  }
+
+  // Fallback: Auto-detect type if no identifierType provided
   // ENS Resolution (requires provider)
   if (provider && input.endsWith('.eth')) {
     try {
@@ -59,7 +151,7 @@ export const resolveRecipient = async (
           address: resolvedAddress,
           type: 'ens',
           metadata: {
-            networkHint: detectRecipientNetwork(resolvedAddress)
+            networkHint: 1 // ENS is typically mainnet
           }
         };
       }
@@ -75,7 +167,7 @@ export const resolveRecipient = async (
       address: checksumAddress,
       type: 'wallet',
       metadata: {
-        networkHint: detectRecipientNetwork(checksumAddress)
+        networkHint: 11155111 // Default to Sepolia testnet for direct address input
       }
     };
   }
@@ -85,12 +177,12 @@ export const resolveRecipient = async (
   if (usernameMatch) {
     try {
       const username = usernameMatch[1];
-      const response = await fetch(`/api/users/resolve`, {
+      const response = await fetch(`/api/resolve-identifier`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          identifier: username,
-          resolveType: 'username' 
+          type: 'username',
+          value: username
         })
       });
 
@@ -99,11 +191,11 @@ export const resolveRecipient = async (
       const userData = await response.json();
       
       return {
-        address: userData.walletAddress,
+        address: userData.address,
         type: 'username',
         metadata: {
           username,
-          networkHint: detectRecipientNetwork(userData.walletAddress)
+          networkHint: userData.metadata?.networkHint
         }
       };
     } catch (err) {
@@ -115,12 +207,12 @@ export const resolveRecipient = async (
   const emailMatch = input.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
   if (emailMatch) {
     try {
-      const response = await fetch(`/api/users/resolve`, {
+      const response = await fetch(`/api/resolve-identifier`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          identifier: input,
-          resolveType: 'email' 
+          type: 'email',
+          value: input
         })
       });
 
@@ -129,11 +221,11 @@ export const resolveRecipient = async (
       const userData = await response.json();
       
       return {
-        address: userData.walletAddress,
+        address: userData.address,
         type: 'email',
         metadata: {
           email: input,
-          networkHint: detectRecipientNetwork(userData.walletAddress)
+          networkHint: userData.metadata?.networkHint
         }
       };
     } catch (err) {

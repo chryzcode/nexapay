@@ -7,6 +7,7 @@ export async function POST(request: NextRequest) {
   let userId: string | null = null;
   let fullname: string | null = null;
   let username: string | null = null;
+  let networkHint: number | null = null;
 
   const client = await dbPromise;
   const db = client.db(); // optionally: client.db('your_db_name')
@@ -15,33 +16,37 @@ export async function POST(request: NextRequest) {
     const user = await db.collection('users').findOne({ walletAddress: value });
     if (user) {
       address = user.walletAddress;
-      userId = user._id.toString();
+      userId = user.userCode;
       fullname = user.fullname || null;
       username = user.username || null;
+      networkHint = user.networkHint || 11155111; // Default to Sepolia testnet
     }
   } else if (type === 'username') {
     const user = await db.collection('users').findOne({ username: value });
     if (user) {
       address = user.walletAddress;
-      userId = user._id.toString();
+      userId = user.userCode;
       fullname = user.fullname || null;
       username = user.username || null;
-    }
-  } else if (type === 'userId') {
-    const user = await db.collection('users').findOne({ _id: value });
-    if (user) {
-      address = user.walletAddress;
-      userId = user._id.toString();
-      fullname = user.fullname || null;
-      username = user.username || null;
+      networkHint = user.networkHint || 11155111; // Default to Sepolia testnet
     }
   } else if (type === 'userCode') {
     const user = await db.collection('users').findOne({ userCode: value });
     if (user) {
       address = user.walletAddress;
-      userId = user._id.toString();
+      userId = user.userCode;
       fullname = user.fullname || null;
       username = user.username || null;
+      networkHint = user.networkHint || 11155111; // Default to Sepolia testnet
+    }
+  } else if (type === 'email') {
+    const user = await db.collection('users').findOne({ email: value });
+    if (user) {
+      address = user.walletAddress;
+      userId = user.userCode;
+      fullname = user.fullname || null;
+      username = user.username || null;
+      networkHint = user.networkHint || 11155111; // Default to Sepolia testnet
     }
   } else {
     return NextResponse.json({ error: 'Invalid identifier type' }, { status: 400 });
@@ -51,5 +56,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ address, userId, fullname, username });
+  return NextResponse.json({ 
+    address, 
+    userId, 
+    fullname, 
+    username,
+    metadata: {
+      networkHint
+    }
+  });
 }

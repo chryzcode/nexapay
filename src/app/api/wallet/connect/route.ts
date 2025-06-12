@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, walletAddress } = await request.json();
+    const { userId, walletAddress, networkHint } = await request.json();
 
     if (!userId || !walletAddress) {
       return NextResponse.json({ error: 'User ID and wallet address are required' }, { status: 400 });
@@ -46,11 +46,11 @@ export async function POST(request: NextRequest) {
     const client = await dbPromise;
     const db = client.db();
 
-    console.log('Updating wallet for user:', userId, 'with address:', walletAddress);
+    console.log('Updating wallet for user:', userId, 'with address:', walletAddress, 'and network:', networkHint);
 
     const result = await db.collection('users').updateOne(
       { _id: new ObjectId(userId) },
-      { $set: { walletAddress } }
+      { $set: { walletAddress, networkHint: networkHint || 11155111 } }
     );
 
     console.log('Update result:', result);

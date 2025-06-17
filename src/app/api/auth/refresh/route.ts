@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import db from "@/lib/db";
+import { ObjectId } from "mongodb";
 
 if (!process.env.JWT_SECRET) {
   throw new Error("JWT_SECRET is not defined");
@@ -26,7 +27,7 @@ export async function POST() {
       
       // Get user from database to ensure they still exist
       const client = await db;
-      const user = await client.db().collection("users").findOne({ _id: decoded.userId });
+      const user = await client.db().collection("users").findOne({ _id: new ObjectId(decoded.userId) });
       
       if (!user) {
         return NextResponse.json(

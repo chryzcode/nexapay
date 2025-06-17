@@ -13,13 +13,17 @@ export async function POST(request: NextRequest) {
   const db = client.db(); // optionally: client.db('your_db_name')
 
   if (type === 'address') {
-    const user = await db.collection('users').findOne({ walletAddress: value });
-    if (user) {
-      address = user.walletAddress;
-      userId = user.userCode;
-      fullname = user.fullname || null;
-      username = user.username || null;
-      networkHint = user.networkHint || 11155111; // Default to Sepolia testnet
+    // For direct wallet address, return the address as-is if it looks like a valid Ethereum address
+    if (value && typeof value === 'string' && value.startsWith('0x') && value.length === 42) {
+      address = value;
+      // Try to find a user with this wallet address for additional metadata
+      const user = await db.collection('users').findOne({ walletAddress: { $regex: new RegExp(`^${value}$`, 'i') } });
+      if (user) {
+        userId = user.userCode;
+        fullname = user.fullname || null;
+        username = user.username || null;
+        networkHint = user.networkHint || 11155111; // Default to Sepolia testnet
+      }
     }
   } else if (type === 'username') {
     const user = await db.collection('users').findOne({ username: value });

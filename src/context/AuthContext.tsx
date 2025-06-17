@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email, password }),
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -131,15 +132,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshToken = async () => {
+    try {
+      const response = await fetch("/api/auth/refresh", {
+        method: "POST",
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error("Token refresh failed");
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      return false;
+    }
+  };
+
   const refreshUser = async () => {
     try {
-      const response = await fetch("/api/auth/me");
+      const response = await fetch("/api/auth/me", {
+        credentials: 'include',
+      });
+      
+      if (response.status === 401) {
+        const refreshSuccess = await refreshToken();
+        if (refreshSuccess) {
+          const retryResponse = await fetch("/api/auth/me", {
+            credentials: 'include',
+          });
+          if (retryResponse.ok) {
+            const data = await retryResponse.json();
+            setUser(data.user);
+            return;
+          }
+        }
+        setUser(null);
+        return;
+      }
+      
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
       }
     } catch (error) {
       console.error("Auth refresh failed:", error);
+      setUser(null);
     }
   };
 

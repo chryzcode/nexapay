@@ -419,9 +419,9 @@ export default function PaymentForm({
     fetchUserId();
   }, [onClose]);
 
-  // Check network compatibility
+  // Check network compatibility and self-transaction
   useEffect(() => {
-    const checkNetworkCompatibility = async () => {
+    const checkNetworkCompatibilityAndSelfTransaction = async () => {
       if (!recipientResolution?.address) {
         setIsNetworkCompatible(true);
         setNetworkErrorMessage("");
@@ -469,6 +469,37 @@ export default function PaymentForm({
           setNetworkErrorMessage("");
         }
 
+        // Check for self-transaction
+        if (senderAddress && recipientResolution.address && senderAddress.toLowerCase() === recipientResolution.address.toLowerCase()) {
+          setNetworkErrorMessage("You cannot send to your own wallet address");
+          setIsNetworkCompatible(false);
+          return;
+        }
+
+        // Also check if the resolved user ID matches the current user ID
+        try {
+          const recipientRes = await fetch('/api/resolve-identifier', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              type: 'address',
+              value: recipientResolution.address
+            })
+          });
+          if (recipientRes.ok) {
+            const data = await recipientRes.json();
+            if (data.userId && data.userId === currentUserId) {
+              setNetworkErrorMessage("You cannot send to yourself");
+              setIsNetworkCompatible(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('Failed to check recipient user ID for self-send check:', err);
+        }
+
         // Log for debugging
         console.log('Network Check:', {
           senderChainId: chainId,
@@ -486,8 +517,8 @@ export default function PaymentForm({
       }
     };
 
-    checkNetworkCompatibility();
-  }, [recipientResolution?.address, recipientResolution?.metadata?.networkHint]);
+    checkNetworkCompatibilityAndSelfTransaction();
+  }, [recipientResolution?.address, recipientResolution?.metadata?.networkHint, senderAddress, currentUserId]);
 
   // Send payment
   const handleSend = useCallback(async (e: React.FormEvent) => {
@@ -625,51 +656,59 @@ export default function PaymentForm({
 
         onSuccess?.();
 
-        // Get recipient's user ID from their wallet address
-        const recipientRes = await fetch('/api/resolve-identifier', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            type: 'address',
-            value: checksummedRecipient
-          })
-        });
-
-        if (!recipientRes.ok) {
-          throw new Error('Failed to resolve recipient user ID');
-        }
-
-        const { userId: recipientUserId } = await recipientRes.json();
-        if (!recipientUserId) {
-          throw new Error('Recipient user ID not found');
-        }
-
-        // Store transaction in database
+        // Attempt to get recipient's user ID from their wallet address for transaction storage
+        let recipientUserId = null;
         try {
-          const response = await fetch('/api/transactions', {
+          const recipientRes = await fetch('/api/resolve-identifier', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              amount: usdAmount,
-              recipientId: recipientUserId,
-              type: 'sent',
-              status: 'completed',
-              txHash: receipt.transactionHash,
-              currency: 'ETH',
-              network: chainId,
-              senderId: currentUserId,
-              createdAt: new Date().toISOString()
-            }),
+              type: 'address',
+              value: checksummedRecipient
+            })
+          });
+
+          if (recipientRes.ok) {
+            const data = await recipientRes.json();
+            recipientUserId = data.userId || null;
+          }
+        } catch (err) {
+          console.error('Failed to resolve recipient user ID:', err);
+        }
+
+        // Store transaction in database, even if user ID is not resolved
+        try {
+          const requestBody = {
+            amount: usdAmount,
+            recipientId: recipientUserId || checksummedRecipient, // Use wallet address as fallback
+            type: 'sent',
+            status: 'completed',
+            txHash: receipt.transactionHash,
+            currency: 'ETH',
+            network: chainId,
+            senderId: currentUserId,
+            createdAt: new Date().toISOString()
+          };
+          console.log('Storing transaction with body:', requestBody);
+          const response = await fetch('/api/transactions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include', // Ensure cookies are sent with the request
+            body: JSON.stringify(requestBody),
           });
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error('Failed to store transaction:', errorText);
-            toast.error('Transaction completed but failed to save record');
+            console.error('Failed to store transaction:', errorText, 'Status:', response.status);
+            if (response.status === 401) {
+              toast.error('Transaction completed but failed to save record due to authentication issue. Please log in again.');
+            } else {
+              toast.error(`Transaction completed but failed to save record: ${errorText}`);
+            }
           } else {
             toast.success(`Payment of $${usdAmount} sent successfully`);
             setMerchant('');

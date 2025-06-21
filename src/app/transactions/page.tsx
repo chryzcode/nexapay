@@ -19,7 +19,35 @@ interface Transaction {
   txHash: string;
   senderWallet?: string;
   recipientWallet?: string;
+  feeAmount?: number;
+  originalAmount?: number;
 }
+
+// Helper function to get network name
+const getNetworkName = (chainId: number): string => {
+  switch (chainId) {
+    case 1: return 'ETH - Ethereum';
+    case 11155111: return 'ETH - Sepolia';
+    case 137: return 'MATIC - Polygon';
+    case 56: return 'BNB - BSC';
+    case 43114: return 'AVAX - Avalanche';
+    default: return 'ETH - Unknown';
+  }
+};
+
+// Helper function to format amount with fee information
+const formatAmount = (tx: Transaction): string => {
+  const currency = getNetworkName(tx.network);
+  const sign = tx.type === 'sent' ? '-' : '+';
+  
+  if (tx.feeAmount && tx.feeAmount > 0) {
+    // Show net amount with fee info
+    return `${sign}$${tx.amount} <span class="text-xs text-gray-500">(${currency})</span>`;
+  } else {
+    // Show regular amount
+    return `${sign}$${tx.amount} <span class="text-xs text-gray-500">(${currency})</span>`;
+  }
+};
 
 export default function Transactions() {
   const { user, loading } = useAuth();
@@ -135,7 +163,7 @@ export default function Transactions() {
                   <div>{new Date(tx.createdAt).toLocaleDateString()}</div>
                   <div>{tx.type === 'sent' ? `To ${tx.recipient.slice(0, 6)}...${tx.recipient.slice(-4)}` : `From ${tx.sender.slice(0, 6)}...${tx.sender.slice(-4)}`}</div>
                   <div className="font-semibold">
-                    {tx.type === 'sent' ? '-' : '+'}${tx.amount} {tx.currency}
+                    <span dangerouslySetInnerHTML={{ __html: formatAmount(tx) }} />
                   </div>
                   <div className={`capitalize font-medium ${tx.status === 'completed' ? 'text-green-500' : tx.status === 'pending' ? 'text-yellow-500' : 'text-red-500'}`}>
                     {tx.status}

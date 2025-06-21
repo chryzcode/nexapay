@@ -680,8 +680,14 @@ export default function PaymentForm({
 
         // Store transaction in database, even if user ID is not resolved
         try {
+          const originalAmount = usdAmount;
+          const feeAmount = usdAmount * 0.05; // 5% fee
+          const netAmount = usdAmount - feeAmount;
+          
           const requestBody = {
-            amount: usdAmount,
+            amount: netAmount, // Amount after fee deduction
+            originalAmount: originalAmount, // Original amount before fee
+            feeAmount: feeAmount, // Fee amount deducted
             recipientId: recipientUserId || checksummedRecipient, // Use wallet address as fallback
             type: 'sent',
             status: 'completed',
@@ -710,7 +716,7 @@ export default function PaymentForm({
               toast.error(`Transaction completed but failed to save record: ${errorText}`);
             }
           } else {
-            toast.success(`Payment of $${usdAmount} sent successfully`);
+            toast.success(`Payment of $${originalAmount} sent successfully (Fee: $${feeAmount.toFixed(2)})`);
             setMerchant('');
             setAmount('');
             setReference('');
@@ -815,6 +821,26 @@ export default function PaymentForm({
                 className={`w-full rounded-xl border px-4 py-3 bg-gray-50 dark:bg-[#232946] ${isDarkMode ? 'text-[#F9F9FB] border-white/10' : 'text-[#111827] border-gray-200'}`}
                 required
               />
+              {amount && !isNaN(Number(amount)) && Number(amount) > 0 && (
+                <div className="mt-2 p-3 bg-gray-50 dark:bg-[#232946] rounded-lg border border-gray-200 dark:border-white/10">
+                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                    <div className="flex justify-between mb-1">
+                      <span>Payment Amount:</span>
+                      <span className="font-medium">${Number(amount).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between mb-1 text-orange-600 dark:text-orange-400">
+                      <span>Platform Fee (5%):</span>
+                      <span className="font-medium">-${(Number(amount) * 0.05).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-gray-200 dark:border-white/10">
+                      <span className="font-semibold">Recipient Receives:</span>
+                      <span className="font-bold text-green-600 dark:text-green-400">
+                        ${(Number(amount) * 0.95).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

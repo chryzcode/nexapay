@@ -57,7 +57,9 @@ export async function GET() {
           recipientWallet: transaction.recipientWallet,
           currency: transaction.currency || 'ETH',
           network: transaction.network,
-          txHash: transaction.txHash
+          txHash: transaction.txHash,
+          feeAmount: transaction.feeAmount,
+          originalAmount: transaction.originalAmount
         })),
       });
     } catch (error) {
@@ -77,7 +79,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { amount, recipientId, type, status, txHash, currency, network, senderId, createdAt } = await request.json();
+    const { amount, recipientId, type, status, txHash, currency, network, senderId, createdAt, feeAmount, originalAmount } = await request.json();
 
     if (!amount || !recipientId || !type || !txHash) {
       return NextResponse.json(
@@ -129,11 +131,13 @@ export async function POST(request: Request) {
       recipientWallet = recipientUser?.walletAddress || null;
     }
 
-    // If this is a payment (type === 'sent'), create both 'sent' and 'received' records
+    // If this is a payment (type === 'sent'), create only one record with fee information
     if (type === 'sent') {
-      // Sent record for sender
-      const sentResult = await transactions.insertOne({
-        amount,
+      // Create a single transaction record with fee breakdown
+      const transactionResult = await transactions.insertOne({
+        amount: amount, // Net amount (after fee deduction)
+        feeAmount: feeAmount || 0, // Fee amount deducted
+        originalAmount: originalAmount || amount, // Original amount before fee
         type: 'sent',
         status: status || "completed",
         senderId: senderId || null,
@@ -146,30 +150,17 @@ export async function POST(request: Request) {
         createdAt: createdAt || new Date(),
         updatedAt: new Date(),
       });
-      // Received record for recipient
-      const receivedResult = await transactions.insertOne({
-        amount,
-        type: 'received',
-        status: status || "completed",
-        senderId: senderId || null,
-        recipientId,
-        senderWallet,
-        recipientWallet,
-        txHash,
-        currency: currency || 'ETH',
-        network,
-        createdAt: createdAt || new Date(),
-        updatedAt: new Date(),
-      });
+      
       return NextResponse.json({
         message: "Transaction created successfully",
-        sentTransactionId: sentResult.insertedId.toString(),
-        receivedTransactionId: receivedResult.insertedId.toString(),
+        transactionId: transactionResult.insertedId.toString(),
       });
     } else {
       // For requests, only create a 'received' record for the recipient
       const result = await transactions.insertOne({
         amount,
+        feeAmount: feeAmount || 0,
+        originalAmount: originalAmount || amount,
         type: 'received',
         status: status || "pending",
         senderId: senderId || null,

@@ -163,8 +163,11 @@ export default function Dashboard() {
         const res = await fetch("/api/transactions");
         if (!res.ok) return;
         const data = await res.json();
-        // Expecting data.transactions as array
-        setTransactions(data.transactions || []);
+        // Sort transactions by date (newest first) to ensure recent transactions are shown
+        const sortedTransactions = (data.transactions || []).sort((a: any, b: any) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setTransactions(sortedTransactions);
       } catch {
         setTransactions([]);
       }

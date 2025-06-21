@@ -1,7 +1,9 @@
 {
-  "contractAddress": "0x25CeE22520c9266D7eb7253dAcb26c6E827571B2",
-  "deployerAddress": "0xac05DF16f4942ac9F8Be7AC929c04Db43B29961d",
-  "blockNumber": null,
+  "contractAddress": "0xE34805ccce8BA2431Af8E7A5D868788CaCb0E501",
+  "mainnetFeeWallet": "0xac05DF16f4942ac9F8Be7AC929c04Db43B29961d",
+  "testnetFeeWallet": "0x301f2068130A357c91995D40B8807Ca818A01300",
+  "feePercentage": 5,
   "chainId": 11155111,
-  "deploymentDate": "2025-05-12T10:51:21.993Z"
+  "networkName": "sepolia",
+  "deployedAt": "2025-06-21T20:43:48.711Z"
 }

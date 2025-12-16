@@ -127,8 +127,20 @@ const NETWORK_STABLECOINS: Record<number, { usdc: TokenInfo; usdt: TokenInfo }> 
   }
 };
 
-// NexaPayPayment contract address (replace with actual deployed address)
-const NEXAPAY_CONTRACT_ADDR = process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT;
+// Network-specific contract addresses mapping
+const CONTRACT_ADDRESSES: Record<number, string> = {
+  // Mainnet Networks
+  1: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_MAINNET || '', // Ethereum Mainnet
+  137: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_POLYGON || '', // Polygon Mainnet
+  56: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_BSC || '', // BSC Mainnet
+  43114: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_AVALANCHE || '', // Avalanche Mainnet
+  
+  // Testnet Networks
+  11155111: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_SEPOLIA || process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT || '', // Sepolia
+  80001: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_MUMBAI || '', // Mumbai (Polygon Testnet)
+  97: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_BSCTEST || '', // BSC Testnet
+  43113: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_FUJI || '', // Fuji (Avalanche Testnet)
+};
 
 enum IdentifierType {
   WALLET = 'wallet',
@@ -450,20 +462,31 @@ export default function PaymentForm({
         }
         
         // Set recipient's network type
-        setRecipientNetworkType(isRecipientTestnet ? "Sepolia (Testnet)" : "Ethereum (Mainnet)");
+        const recipientChainId = (recipientNetworkHint as number) || chainId;
+        const recipientChainName = getChainName(recipientChainId);
+        setRecipientNetworkType(recipientChainName);
         
-        // Allow if both are on testnet or both are on mainnet
-        const isCompatible = isSenderTestnet === isRecipientTestnet;
-        setIsNetworkCompatible(isCompatible);
-
+        // Allow cross-chain payments via Stargate (both testnet and mainnet supported)
+        // Only block if explicitly incompatible (e.g., testnet to mainnet)
+        const isCompatible = true; // Stargate handles cross-chain
+        
+        // Check if Stargate supports both chains (Stargate only works on mainnets)
+        const isSameChain = chainId === recipientChainId;
+        const isMainnet = chainId === 1 || chainId === 137 || chainId === 56 || chainId === 43114;
+        const isDstMainnet = recipientChainId === 1 || recipientChainId === 137 || recipientChainId === 56 || recipientChainId === 43114;
+        
+        // Stargate only supports mainnet-to-mainnet cross-chain
+        // For testnets or testnet-to-mainnet, we don't support cross-chain
+        const stargateSupported = isMainnet && isDstMainnet && STARGATE_ROUTER_ADDRESSES[chainId] && LZ_CHAIN_IDS[recipientChainId];
+        
+        setIsNetworkCompatible(Boolean(isCompatible && (isSameChain || stargateSupported)));
+        
         // Set appropriate error message
-        if (!isCompatible) {
-          if (isSenderTestnet && !isRecipientTestnet) {
-            setNetworkErrorMessage("Cannot send from testnet to mainnet");
-          } else if (!isSenderTestnet && isRecipientTestnet) {
-            setNetworkErrorMessage("Cannot send from mainnet to testnet");
+        if (!isSameChain && !stargateSupported) {
+          if (!isMainnet || !isDstMainnet) {
+            setNetworkErrorMessage("Cross-chain payments via Stargate only work between mainnets. For testnets, use same-chain transfers.");
           } else {
-            setNetworkErrorMessage("Network mismatch");
+            setNetworkErrorMessage("Cross-chain payment not supported between these networks");
           }
         } else {
           setNetworkErrorMessage("");
@@ -524,8 +547,8 @@ export default function PaymentForm({
   const handleSend = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Reset sending state
-    setSending(false);
+    // Set sending state
+    setSending(true);
     
     // Validate MetaMask connection
     if (!window.ethereum) {
@@ -563,16 +586,10 @@ export default function PaymentForm({
         throw new Error(`Network ${chainId} not supported`);
       }
 
-      // Validate network compatibility
-      const isTestnet = chainId === 11155111; // Sepolia testnet
-      const recipientNetworkHint = recipientResolution.metadata?.networkHint;
-      
-      if (recipientNetworkHint) {
-        const isRecipientTestnet = recipientNetworkHint === 11155111;
-        if (isTestnet !== isRecipientTestnet) {
-          throw new Error(`Network mismatch: You are on ${isTestnet ? 'testnet' : 'mainnet'} but recipient is on ${isRecipientTestnet ? 'testnet' : 'mainnet'}`);
-        }
-      }
+      // Get recipient's network from metadata
+      const recipientNetworkHint = recipientResolution.metadata?.networkHint as number | undefined;
+      const dstChainId = recipientNetworkHint || chainId;
+      const isCrossChain = chainId !== dstChainId;
 
       // Get current ETH price in USD
       const ethPriceResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
@@ -592,48 +609,95 @@ export default function PaymentForm({
         ethAmount,
         weiAmount,
         ethPrice,
-        balance: balance.toString()
+        balance: balance.toString(),
+        isCrossChain,
+        srcChainId: chainId,
+        dstChainId
       });
 
       if (new BN(balance.toString()).lt(new BN(weiAmount))) {
         throw new Error(`Insufficient ETH balance. Required: ${ethAmount.toFixed(6)} ETH ($${usdAmount}), Available: ${web3Nexa.utils.fromWei(balance.toString(), 'ether')} ETH`);
       }
 
-      // Get gas estimate for ETH transfer
-      const gasEstimate = await web3Nexa.eth.estimateGas({
-        from,
-        to: checksummedRecipient,
-        value: weiAmount
-      });
+      let receipt;
 
-      // Add 30% buffer to gas estimate
-      const gasWithBuffer = Math.floor(Number(gasEstimate.toString()) * 1.3).toString();
-      const gasPrice = await web3Nexa.eth.getGasPrice();
-      const adjustedGasPrice = Math.floor(Number(gasPrice.toString()) * 1.1).toString();
+      if (isCrossChain) {
+        // Use Stargate for cross-chain payment (mainnet only - Stargate doesn't support testnets)
+        console.log('Using Stargate for cross-chain payment');
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        
+        // Check if Stargate is supported on source chain (mainnets only)
+        if (!STARGATE_ROUTER_ADDRESSES[chainId]) {
+          throw new Error(`Stargate not supported on source chain ${chainId}. Stargate only supports mainnets (Ethereum, Polygon, BSC, Avalanche). For testnets, use same-chain transfers.`);
+        }
+        if (!LZ_CHAIN_IDS[dstChainId]) {
+          throw new Error(`Stargate not supported on destination chain ${dstChainId}. Stargate only supports mainnets.`);
+        }
 
-      console.log('Sending ETH with params:', {
-        gas: gasWithBuffer,
-        gasPrice: adjustedGasPrice,
-        from,
-        to: checksummedRecipient,
-        value: weiAmount
-      });
+        try {
+          receipt = await stargateSwap({
+            provider,
+            srcChainId: chainId,
+            dstChainId: dstChainId,
+            srcPoolId: 1, // ETH pool ID
+            dstPoolId: 1, // ETH pool ID
+            amount: weiAmount,
+            recipient: checksummedRecipient,
+            minAmount: 0
+          });
+          console.log('Stargate swap successful:', receipt);
+        } catch (stargateError: any) {
+          console.error('Stargate swap failed:', stargateError);
+          throw new Error(`Cross-chain payment failed: ${stargateError.message || stargateError.reason || 'Unknown error'}`);
+        }
+      } else {
+        // Same-chain payment - use contract if available, otherwise direct transfer
+        const contractAddress = CONTRACT_ADDRESSES[chainId];
+        
+        if (contractAddress) {
+          // Use contract for fee collection
+          console.log('Using contract for same-chain payment with fee collection');
+          const contract = new web3Nexa.eth.Contract(NEXAPAY_ABI, contractAddress);
+          
+          // For ETH payments, we need to use a wrapped token or direct transfer
+          // Since contract only handles ERC20, we'll do direct transfer but track fees off-chain
+          // In the future, you could wrap ETH to WETH and use the contract
+          console.log('Contract available but ETH not supported, using direct transfer with off-chain fee tracking');
+        }
+        
+        // Direct ETH transfer for same-chain (fees tracked off-chain)
+        const gasEstimate = await web3Nexa.eth.estimateGas({
+          from,
+          to: checksummedRecipient,
+          value: weiAmount
+        });
 
-      try {
-        // Send ETH
-        const receipt = await web3Nexa.eth.sendTransaction({
+        const gasWithBuffer = Math.floor(Number(gasEstimate.toString()) * 1.3).toString();
+        const gasPrice = await web3Nexa.eth.getGasPrice();
+        const adjustedGasPrice = Math.floor(Number(gasPrice.toString()) * 1.1).toString();
+
+        console.log('Sending ETH with params:', {
+          gas: gasWithBuffer,
+          gasPrice: adjustedGasPrice,
+          from,
+          to: checksummedRecipient,
+          value: weiAmount
+        });
+
+        receipt = await web3Nexa.eth.sendTransaction({
           from,
           to: checksummedRecipient,
           value: weiAmount,
           gas: gasWithBuffer,
           gasPrice: adjustedGasPrice
         });
+      }
 
-        console.log('Transaction successful:', receipt);
-        toast.success('Payment sent successfully!');
+      console.log('Transaction successful:', receipt);
+      toast.success(isCrossChain ? 'Cross-chain payment initiated via Stargate!' : 'Payment sent successfully!');
 
-        // Update request status if this was a payment for a request
-        if (requestId) {
+      // Update request status if this was a payment for a request
+      if (requestId) {
           try {
             const response = await fetch(`/api/requests/${requestId}/approve`, {
               method: 'POST',
@@ -730,12 +794,6 @@ export default function PaymentForm({
           console.error('Error storing transaction:', dbError);
           toast.error('Transaction completed but failed to save record');
         }
-
-        return;
-      } catch (err: any) {
-        console.error('ETH transfer failed:', err);
-        throw new Error(`Payment failed: ${err.message}`);
-      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       toast.error(`Payment failed: ${message}`);
@@ -743,6 +801,21 @@ export default function PaymentForm({
       setSending(false);
     }
   }, [recipientResolution, amount, reference, onClose, currentUserId, onSuccess, requestId]);
+
+  const [chainId, setChainId] = useState<number>(11155111); // default to Sepolia
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.ethereum) {
+      window.ethereum.request({ method: 'eth_chainId' }).then((id: string) => {
+        setChainId(Number(id));
+      });
+      window.ethereum.on('chainChanged', (id: string) => {
+        setChainId(Number(id));
+      });
+    }
+  }, []);
+
+  const contractAddress = CONTRACT_ADDRESSES[chainId] || '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -855,7 +928,14 @@ export default function PaymentForm({
             </div>
 
             <div className="text-center text-base font-semibold mb-2">
-              {getChainName(srcChainId)} <span className="mx-2">→</span> {recipientInput && recipientResolution?.address ? recipientNetworkType : ''}
+              {getChainName(chainId)} <span className="mx-2">→</span> {recipientInput && recipientResolution?.address ? recipientNetworkType : ''}
+              {(() => {
+                const networkHint = recipientResolution?.metadata?.networkHint;
+                if (typeof networkHint === 'number' && chainId !== networkHint) {
+                  return <span className="ml-2 text-xs text-blue-500">(Cross-chain via Stargate)</span>;
+                }
+                return null;
+              })()}
             </div>
 
             {usdValue && (

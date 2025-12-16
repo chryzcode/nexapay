@@ -212,3 +212,27 @@ For support and questions:
 ---
 
 **Note**: Always test on testnet before deploying to mainnet. The fee collection system is designed to be secure and efficient, automatically routing fees to the appropriate wallets based on the network.
+
+# Multi-Network Contract Configuration
+
+To support both testnet and mainnet transactions, set the following in your `.env` file:
+
+```
+# Mainnet contract address
+NEXT_PUBLIC_NEXAPAY_CONTRACT_MAINNET=0xYourMainnetContractAddress
+
+# Sepolia (testnet) contract address
+NEXT_PUBLIC_NEXAPAY_CONTRACT_SEPOLIA=0xYourSepoliaContractAddress
+
+# (Optional fallback for testnet)
+NEXT_PUBLIC_NEXAPAY_CONTRACT=0xYourSepoliaContractAddress
+```
+
+The frontend will automatically select the correct contract address based on the user's current network (chainId).
+
+- Ethereum Mainnet: `NEXT_PUBLIC_NEXAPAY_CONTRACT_MAINNET`
+- Sepolia Testnet: `NEXT_PUBLIC_NEXAPAY_CONTRACT_SEPOLIA` or `NEXT_PUBLIC_NEXAPAY_CONTRACT`
+
+If you deploy to more networks, add them to the mapping in `PaymentForm.tsx`.
+
+---

@@ -32,8 +32,20 @@ const NEXAPAY_ABI = [
   }
 ];
 
-// Contract address from environment variable
-const NEXAPAY_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT;
+// Network-specific contract addresses mapping
+const CONTRACT_ADDRESSES: Record<number, string> = {
+  // Mainnet Networks
+  1: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_MAINNET || '', // Ethereum Mainnet
+  137: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_POLYGON || '', // Polygon Mainnet
+  56: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_BSC || '', // BSC Mainnet
+  43114: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_AVALANCHE || '', // Avalanche Mainnet
+  
+  // Testnet Networks
+  11155111: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_SEPOLIA || process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT || '', // Sepolia
+  80001: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_MUMBAI || '', // Mumbai (Polygon Testnet)
+  97: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_BSCTEST || '', // BSC Testnet
+  43113: process.env.NEXT_PUBLIC_NEXAPAY_CONTRACT_FUJI || '', // Fuji (Avalanche Testnet)
+};
 
 interface RequestItem {
   _id: string;
@@ -199,15 +211,12 @@ export default function RequestsDashboard({ currentUserId }: Props) {
         });
       } else {
         // Use smart contract for same-chain payment
-        const contract = new web3.eth.Contract(NEXAPAY_ABI, NEXAPAY_CONTRACT_ADDRESS);
+        // Get network-specific contract address
+        const contractAddress = CONTRACT_ADDRESSES[srcChainId];
         
-        // Check if ETH is supported
-        const ethAddress = "0x0000000000000000000000000000000000000000";
-        const isEthSupported = await contract.methods.supportedTokens(ethAddress).call();
-        
-        if (!isEthSupported) {
-          // If ETH is not supported, fall back to direct transfer
-          console.log('ETH not supported by contract, using direct transfer');
+        if (!contractAddress) {
+          // If no contract address for this network, fall back to direct transfer
+          console.log(`No contract address configured for chain ${srcChainId}, using direct transfer`);
           const gasEstimate = await web3.eth.estimateGas({
             from: payerAddress,
             to: checksummedRecipient,
@@ -226,37 +235,65 @@ export default function RequestsDashboard({ currentUserId }: Props) {
             gasPrice: adjustedGasPrice
           });
         } else {
-          // Use contract for payment
-          const gasEstimate = await contract.methods.pay(
-            ethAddress,
-            checksummedRecipient,
-            weiAmount,
-            `Request payment: ${request._id}`
-          ).estimateGas({ from: payerAddress, value: weiAmount });
+          const contract = new web3.eth.Contract(NEXAPAY_ABI, contractAddress);
+          
+          // Check if ETH is supported
+          const ethAddress = "0x0000000000000000000000000000000000000000";
+          const isEthSupported = await contract.methods.supportedTokens(ethAddress).call();
+          
+          if (!isEthSupported) {
+            // If ETH is not supported, fall back to direct transfer
+            console.log('ETH not supported by contract, using direct transfer');
+            const gasEstimate = await web3.eth.estimateGas({
+              from: payerAddress,
+              to: checksummedRecipient,
+              value: weiAmount
+            });
 
-          const gasWithBuffer = Math.floor(Number(gasEstimate.toString()) * 1.3).toString();
-          const gasPrice = await web3.eth.getGasPrice();
-          const adjustedGasPrice = Math.floor(Number(gasPrice.toString()) * 1.1).toString();
+            const gasWithBuffer = Math.floor(Number(gasEstimate.toString()) * 1.3).toString();
+            const gasPrice = await web3.eth.getGasPrice();
+            const adjustedGasPrice = Math.floor(Number(gasPrice.toString()) * 1.1).toString();
 
-          console.log('Sending payment with params:', {
-            gas: gasWithBuffer,
-            gasPrice: adjustedGasPrice,
-            from: payerAddress,
-            to: NEXAPAY_CONTRACT_ADDRESS,
-            value: weiAmount
-          });
+            receipt = await web3.eth.sendTransaction({
+              from: payerAddress,
+              to: checksummedRecipient,
+              value: weiAmount,
+              gas: gasWithBuffer,
+              gasPrice: adjustedGasPrice
+            });
+          } else {
+            // Use contract for payment
+            const gasEstimate = await contract.methods.pay(
+              ethAddress,
+              checksummedRecipient,
+              weiAmount,
+              `Request payment: ${request._id}`
+            ).estimateGas({ from: payerAddress, value: weiAmount });
 
-          receipt = await contract.methods.pay(
-            ethAddress,
-            checksummedRecipient,
-            weiAmount,
-            `Request payment: ${request._id}`
-          ).send({
-            from: payerAddress,
-            value: weiAmount,
-            gas: gasWithBuffer,
-            gasPrice: adjustedGasPrice
-          });
+            const gasWithBuffer = Math.floor(Number(gasEstimate.toString()) * 1.3).toString();
+            const gasPrice = await web3.eth.getGasPrice();
+            const adjustedGasPrice = Math.floor(Number(gasPrice.toString()) * 1.1).toString();
+
+            console.log('Sending payment with params:', {
+              gas: gasWithBuffer,
+              gasPrice: adjustedGasPrice,
+              from: payerAddress,
+              to: contractAddress,
+              value: weiAmount
+            });
+
+            receipt = await contract.methods.pay(
+              ethAddress,
+              checksummedRecipient,
+              weiAmount,
+              `Request payment: ${request._id}`
+            ).send({
+              from: payerAddress,
+              value: weiAmount,
+              gas: gasWithBuffer,
+              gasPrice: adjustedGasPrice
+            });
+          }
         }
       }
 

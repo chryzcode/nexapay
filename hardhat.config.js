@@ -41,7 +41,60 @@ const config = {
     networks: {
         sepolia: {
             url: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
-            accounts: process.env.DEPLOYER_PK ? [process.env.DEPLOYER_PK] : [],
+            accounts: process.env.DEPLOYER_PK ? (() => {
+                const pk = process.env.DEPLOYER_PK.trim();
+                return [pk.startsWith('0x') ? pk : `0x${pk}`];
+            })() : [],
+        },
+        mainnet: {
+            url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
+            accounts: process.env.DEPLOYER_PK ? (() => {
+                const pk = process.env.DEPLOYER_PK.trim();
+                return [pk.startsWith('0x') ? pk : `0x${pk}`];
+            })() : [],
+            gasPrice: 20000000000, // 20 gwei
+        },
+        polygon: {
+            url: `https://polygon-rpc.com/`,
+            accounts: process.env.DEPLOYER_PK ? (() => {
+                const pk = process.env.DEPLOYER_PK.trim();
+                return [pk.startsWith('0x') ? pk : `0x${pk}`];
+            })() : [],
+        },
+        mumbai: {
+            url: `https://polygon-mumbai.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
+            accounts: process.env.DEPLOYER_PK ? (() => {
+                const pk = process.env.DEPLOYER_PK.trim();
+                return [pk.startsWith('0x') ? pk : `0x${pk}`];
+            })() : [],
+        },
+        bsc: {
+            url: `https://bsc-dataseed.binance.org/`,
+            accounts: process.env.DEPLOYER_PK ? (() => {
+                const pk = process.env.DEPLOYER_PK.trim();
+                return [pk.startsWith('0x') ? pk : `0x${pk}`];
+            })() : [],
+        },
+        bsctest: {
+            url: `https://data-seed-prebsc-1-s1.binance.org:8545/`,
+            accounts: process.env.DEPLOYER_PK ? (() => {
+                const pk = process.env.DEPLOYER_PK.trim();
+                return [pk.startsWith('0x') ? pk : `0x${pk}`];
+            })() : [],
+        },
+        avalanche: {
+            url: `https://api.avax.network/ext/bc/C/rpc`,
+            accounts: process.env.DEPLOYER_PK ? (() => {
+                const pk = process.env.DEPLOYER_PK.trim();
+                return [pk.startsWith('0x') ? pk : `0x${pk}`];
+            })() : [],
+        },
+        fuji: {
+            url: `https://api.avax-test.network/ext/bc/C/rpc`,
+            accounts: process.env.DEPLOYER_PK ? (() => {
+                const pk = process.env.DEPLOYER_PK.trim();
+                return [pk.startsWith('0x') ? pk : `0x${pk}`];
+            })() : [],
         },
     },
     paths: {
@@ -51,4 +104,4 @@ const config = {
         artifacts: "./artifacts",
     },
 };
-exports.default = config;
+module.exports = config;

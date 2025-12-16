@@ -1,0 +1,13 @@
+{
+  "contractAddress": "0x9F8ec416836cb683D46BA8EcC8BfD6a01039246F",
+  "mainnetFeeWallet": "0xac05DF16f4942ac9F8Be7AC929c04Db43B29961d",
+  "testnetFeeWallet": "0x301f2068130A357c91995D40B8807Ca818A01300",
+  "feePercentage": 500,
+  "chainId": 11155111,
+  "networkName": "sepolia",
+  "deployedAt": "2025-12-16T15:05:10.489Z",
+  "supportedTokens": [
+    "0x7169d38820dfd117c3fa1f22a697dc8d4277c485",
+    "0x1c7d4b196cb0c7b01d3e18fbfd9a0fd5963e1f05"
+  ]
+}
